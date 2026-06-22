@@ -1,3 +1,7 @@
+local Window = _G.AlphaWindow
+local MainTab = Window:CreateTab("Main", 4483362458)
+local SectionSell = MainTab:CreateSection("Automation")
+
 local player = game.Players.LocalPlayer
 local myPlot = nil
 
