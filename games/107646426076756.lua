@@ -17,8 +17,8 @@ myPlot = findMyPlot()
 
 local AutoSellEnabled = false
 
-local Toggle = MainTab:CreateToggle({
-    Name = "Auto Sell Crates",
+local AutoSell = MainTab:CreateToggle({
+    Name = "AutoSell",
     CurrentValue = false,
     Flag = "AutoSellToggle",
     Callback = function(Value)
