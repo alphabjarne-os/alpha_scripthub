@@ -38,16 +38,4 @@ if scriptContent and not scriptContent:find("404") and not scriptContent:find("N
     if not runSuccess then
         warn("AlphaHub Error: " .. tostring(runError))
     end
-else
-    local Window = Rayfield:CreateWindow({
-        Name = "Universal Hub",
-        LoadingTitle = "Rayfield Interface Suite",
-        LoadingSubtitle = "by alphabjarne-os",
-        ConfigurationSaving = {Enabled = false, FolderName = nil, FileName = "Universal"},
-        Discord = {Enabled = false, Invite = "noinvitelink", RememberJoins = true},
-    })
-    
-    local MainTab = Window:CreateTab("Universal", 4483362458)
-    MainTab:CreateSection("Game ID: " .. placeId)
-    MainTab:CreateSection("Status: Not Supported Yet")
 end

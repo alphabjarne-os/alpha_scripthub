@@ -1,6 +1,6 @@
 local Window = _G.AlphaWindow
-local MainTab = Window:CreateTab("Main", 4483362458)
-local SectionSell = MainTab:CreateSection("Automation")
+local Tab = Window:CreateTab("Main", 4483362458)
+local SectionSell = Tab:CreateSection("Automation")
 
 local player = game.Players.LocalPlayer
 local myPlot = nil
@@ -21,7 +21,7 @@ myPlot = findMyPlot()
 
 local AutoSellEnabled = false
 
-local AutoSell = MainTab:CreateToggle({
+local AutoSell = Tab:CreateToggle({
     Name = "AutoSell",
     CurrentValue = false,
     Flag = "AutoSellToggle",
