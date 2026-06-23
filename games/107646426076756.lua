@@ -507,7 +507,7 @@ MainTab:CreateToggle({
                                 local targetAttempts = 0
                                 while AutoPlantBest and _G.AlphaScriptExecutionId == currentExecId do
                                     local bestTool = nil
-                                    local bestCost = -1
+                                    local bestPrice = -1
                                     local toolsToSearch = {}
                                     for _, t in ipairs(player.Backpack:GetChildren()) do
                                         table.insert(toolsToSearch, t)
@@ -519,9 +519,9 @@ MainTab:CreateToggle({
                                         if tool:IsA("Tool") and tool:GetAttribute("InventoryCategory") == "Seeds" then
                                             local plantName = tool:GetAttribute("Plant")
                                             local plantData = PlantsConfig[plantName]
-                                            local cost = plantData and plantData.Cost or 0
-                                            if cost > bestCost then
-                                                bestCost = cost
+                                            local price = plantData and plantData.Price or 0
+                                            if price > bestPrice then
+                                                bestPrice = price
                                                 bestTool = tool
                                             end
                                         end
@@ -538,12 +538,12 @@ MainTab:CreateToggle({
                                                 local crop = getSlotCrop(slot)
                                                 local cropName = crop and (crop:GetAttribute("Plant") or crop.Name) or nil
                                                 local plantData = cropName and PlantsConfig[cropName]
-                                                local cropCost = plantData and plantData.Cost or 0
+                                                local cropPrice = plantData and plantData.Price or 0
                                                 local isGrown = crop and isCropGrown(crop) or false
                                                 table.insert(slots, {
                                                     dirt = dirt,
                                                     crop = crop,
-                                                    cropCost = cropCost,
+                                                    cropPrice = cropPrice,
                                                     isGrown = isGrown
                                                 })
                                             end
@@ -555,7 +555,7 @@ MainTab:CreateToggle({
                                         if prioA ~= prioB then
                                             return prioA < prioB
                                         end
-                                        return a.cropCost < b.cropCost
+                                        return a.cropPrice < b.cropPrice
                                     end)
                                     local target = slots[1]
                                     if not target then
@@ -591,7 +591,7 @@ MainTab:CreateToggle({
                                         end)
                                         task.wait(0.02)
                                     else
-                                        if bestCost > target.cropCost then
+                                        if bestPrice > target.cropPrice then
                                             pcall(function()
                                                 removePlant:FireServer(target.dirt)
                                             end)
@@ -758,22 +758,24 @@ local function shouldAutoBuySeed(seedName, currentMoney)
     if not plantData then return false end
     
     if AutoDetectRarities then
-        local maxAffordableCost = 0
+        local maxAffordablePrice = 0
         local bestPlant = nil
         for name, pData in pairs(PlantsConfig) do
-            if pData.Cost and pData.Cost <= currentMoney then
-                if pData.Cost > maxAffordableCost then
-                    maxAffordableCost = pData.Cost
+            local pPrice = pData.Price or 0
+            if pPrice > 0 and pPrice <= currentMoney then
+                if pPrice > maxAffordablePrice then
+                    maxAffordablePrice = pPrice
                     bestPlant = pData
                 end
             end
         end
         
-        if maxAffordableCost <= 0 then
+        if maxAffordablePrice <= 0 then
             return true
         end
         
-        if plantData.Cost >= maxAffordableCost then
+        local plantPrice = plantData.Price or 0
+        if plantPrice >= maxAffordablePrice then
             return true
         end
         
@@ -793,7 +795,7 @@ local function shouldAutoBuySeed(seedName, currentMoney)
             end
         end
         
-        if currentRarityOrder >= bestRarityOrder or plantData.Cost >= (maxAffordableCost * 0.6) then
+        if currentRarityOrder >= bestRarityOrder or plantPrice >= (maxAffordablePrice * 0.6) then
             return true
         end
         
@@ -834,15 +836,15 @@ local function checkAndBuySeeds()
             if val == seedName then
                 local plantData = PlantsConfig[seedName]
                 if plantData then
-                    local cost = plantData.Cost
+                    local price = plantData.Price or 0
                     local shouldBuy = shouldAutoBuySeed(seedName, currentMoney)
                     
-                    if shouldBuy and currentMoney >= cost then
+                    if shouldBuy and currentMoney >= price then
                         if BuySeedEvent then
                             pcall(function()
                                 BuySeedEvent:FireServer(slotIndex)
                             end)
-                            currentMoney = currentMoney - cost
+                            currentMoney = currentMoney - price
                             local model = workspace:FindFirstChild(seedName)
                             if model then
                                 model.Name = "ProcessedSeed"
@@ -925,15 +927,15 @@ rollConnection = RollSeedsEvent.OnClientEvent:Connect(function(arg1, arg2)
                     if seedName then
                         local plantData = PlantsConfig[seedName]
                         if plantData then
-                            local cost = plantData.Cost
+                            local price = plantData.Price or 0
                             local shouldBuy = shouldAutoBuySeed(seedName, currentMoney)
                             
-                            if shouldBuy and currentMoney >= cost then
+                            if shouldBuy and currentMoney >= price then
                                 if BuySeedEvent then
                                     pcall(function()
                                         BuySeedEvent:FireServer(slotIndex)
                                     end)
-                                    currentMoney = currentMoney - cost
+                                    currentMoney = currentMoney - price
                                     local model = workspace:FindFirstChild(seedName)
                                     if model then
                                         model.Name = "ProcessedSeed"
@@ -1013,13 +1015,14 @@ task.spawn(function()
         local success, err = pcall(function()
             if AutoDetectRarities then
                 local currentMoney = getMyMoney()
-                local maxAffordableCost = 0
+                local maxAffordablePrice = 0
                 local bestPlant = nil
                 local bestPlantName = "None"
                 for name, pData in pairs(PlantsConfig) do
-                    if pData.Cost and pData.Cost <= currentMoney then
-                        if pData.Cost > maxAffordableCost then
-                            maxAffordableCost = pData.Cost
+                    local pPrice = pData.Price or 0
+                    if pPrice > 0 and pPrice <= currentMoney then
+                        if pPrice > maxAffordablePrice then
+                            maxAffordablePrice = pPrice
                             bestPlant = pData
                             bestPlantName = name
                         end
