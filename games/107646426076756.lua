@@ -428,7 +428,7 @@ local AutoPlantBest = false
 MainTab:CreateToggle({
     Name = "Auto Plant Best",
     CurrentValue = false,
-    Flag = "AlphaAutoPlantBest_" .. "Floor1",
+    Flag = "AlphaAutoPlantBest_Floor1",
     Callback = function(Value)
         AutoPlantBest = Value
         if AutoPlantBest then
