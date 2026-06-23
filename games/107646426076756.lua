@@ -1126,25 +1126,6 @@ for _, rarityInfo in ipairs(sortedRarities) do
 end
 
 MainTab:CreateDropdown({
-    Name = "Auto Buy Rarities",
-    Options = rarityOptions,
-    CurrentOption = {},
-    MultipleOptions = true,
-    Flag = "AlphaAutoBuyRaritiesDropdown",
-    Callback = function(Option)
-        SelectedRarities = {}
-        if type(Option) == "table" then
-            for _, opt in ipairs(Option) do
-                SelectedRarities[opt:lower()] = true
-            end
-        elseif type(Option) == "string" then
-            SelectedRarities[Option:lower()] = true
-        end
-        task.spawn(checkAndBuySeeds)
-    end,
-})
-
-MainTab:CreateDropdown({
     Name = "Auto-Detect Blacklist",
     Options = rarityOptions,
     CurrentOption = {},
@@ -1158,6 +1139,25 @@ MainTab:CreateDropdown({
             end
         elseif type(Option) == "string" then
             BlacklistedRarities[Option:lower()] = true
+        end
+        task.spawn(checkAndBuySeeds)
+    end,
+})
+
+MainTab:CreateDropdown({
+    Name = "Auto Buy Rarities",
+    Options = rarityOptions,
+    CurrentOption = {},
+    MultipleOptions = true,
+    Flag = "AlphaAutoBuyRaritiesDropdown",
+    Callback = function(Option)
+        SelectedRarities = {}
+        if type(Option) == "table" then
+            for _, opt in ipairs(Option) do
+                SelectedRarities[opt:lower()] = true
+            end
+        elseif type(Option) == "string" then
+            SelectedRarities[Option:lower()] = true
         end
         task.spawn(checkAndBuySeeds)
     end,
