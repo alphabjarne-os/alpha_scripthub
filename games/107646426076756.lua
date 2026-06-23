@@ -355,6 +355,51 @@ MainTab:CreateButton({
     end,
 })
 
+MainTab:CreateButton({
+    Name = "Remove all Plants",
+    Callback = function()
+        local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+        local removePlant = remotes and remotes:FindFirstChild("RemovePlant")
+        if not removePlant then
+            warn("[Alpha Hub] RemovePlant remote not found!")
+            return
+        end
+        if not myPlot then myPlot = findMyPlot() end
+        if not myPlot then return end
+        
+        local activePlots = {}
+        local fp1 = findFarmPlot("Floor1")
+        if fp1 then
+            table.insert(activePlots, fp1)
+        end
+        for _, child in ipairs(myPlot:GetChildren()) do
+            if child.Name:match("^Floor%d+$") then
+                local fp = findFarmPlot(child.Name)
+                if fp then
+                    table.insert(activePlots, fp)
+                end
+            end
+        end
+        
+        task.spawn(function()
+            for _, farmPlot in ipairs(activePlots) do
+                for _, slot in ipairs(farmPlot:GetChildren()) do
+                    local dirt = slot:FindFirstChild("Dirt")
+                    if dirt then
+                        local crop = getSlotCrop(slot)
+                        if crop then
+                            pcall(function()
+                                removePlant:FireServer(dirt)
+                            end)
+                            task.wait(0.02)
+                        end
+                    end
+                end
+            end
+        end)
+    end,
+})
+
 MainTab:CreateSection("Plant Automation")
 
 local AutoUnlockGround = false
@@ -1009,7 +1054,6 @@ MainTab:CreateToggle({
 })
 
 local DetectedRarityParagraph = MainTab:CreateParagraph({Title = "Auto-Detect Status", Content = "Auto-Detect: Disabled"})
-
 task.spawn(function()
     while _G.AlphaScriptExecutionId == currentExecId do
         local success, err = pcall(function()
