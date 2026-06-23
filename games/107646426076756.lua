@@ -249,6 +249,10 @@ rollConnection = RollSeedsEvent.OnClientEvent:Connect(function(arg1, arg2)
             
             local isSkipped = true
             if prompt then
+                local startCheck = tick()
+                while prompt.Enabled and tick() - startCheck < 0.15 do
+                    task.wait()
+                end
                 if not prompt.Enabled then
                     isSkipped = false
                     local completed = false
@@ -268,10 +272,6 @@ rollConnection = RollSeedsEvent.OnClientEvent:Connect(function(arg1, arg2)
             else
                 task.wait(1.5)
             end
-            
-            pcall(function()
-                RollAnimationDoneEvent:FireServer(rollId)
-            end)
             
             if not isSkipped then
                 task.wait(0.2)
@@ -324,6 +324,10 @@ rollConnection = RollSeedsEvent.OnClientEvent:Connect(function(arg1, arg2)
                     end
                 end
             end
+            
+            pcall(function()
+                RollAnimationDoneEvent:FireServer(rollId)
+            end)
         end)
         isProcessingRoll = false
     end
