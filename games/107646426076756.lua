@@ -526,6 +526,44 @@ MainTab:CreateDropdown({
     end,
 })
 
+local function getSlotCrop(slot)
+    for _, child in ipairs(slot:GetChildren()) do
+        if child:IsA("Model") and child.Name ~= "Lock" and child.Name ~= "Dirt" then
+            return child
+        end
+    end
+    local dirt = slot:FindFirstChild("Dirt")
+    if dirt then
+        for _, child in ipairs(dirt:GetChildren()) do
+            if child:IsA("Model") then
+                return child
+            end
+        end
+    end
+    return nil
+end
+
+local function isCropGrown(crop)
+    if not crop then return false end
+    if crop:GetAttribute("Grown") == true or crop:GetAttribute("IsGrown") == true or crop:GetAttribute("Harvestable") == true then
+        return true
+    end
+    local stage = crop:GetAttribute("Stage")
+    local maxStage = crop:GetAttribute("MaxStage")
+    if stage and maxStage and stage >= maxStage then
+        return true
+    end
+    local progress = crop:GetAttribute("Progress")
+    if progress and progress >= 100 then
+        return true
+    end
+    local state = crop:GetAttribute("CropState") or crop:GetAttribute("State")
+    if state and (tostring(state):lower():find("grown") or tostring(state):lower():find("ready") or tostring(state):lower():find("harvest")) then
+        return true
+    end
+    return false
+end
+
 local function findFarmPlot(floorId)
     if not myPlot then myPlot = findMyPlot() end
     if not myPlot then return nil end
@@ -607,7 +645,7 @@ local function addFloorSection(floorId, displayName)
         if not surfaceGui then return end
         
         local FloorTab = Window:CreateTab(displayName, 4483362458)
-        FloorTab:CreateSection("Auto Upgrades")
+        FloorTab:CreateSection("Automation")
         
         local AutoUnlockGround = false
         FloorTab:CreateToggle({
@@ -651,13 +689,8 @@ local function addFloorSection(floorId, displayName)
                                                 end
                                                 
                                                 if isLocked then
-                                                    local plotKey = child:GetAttribute("PlotKey") or tonumber(child.Name:match("%d+"))
-                                                    local ring = 1
-                                                    if plotKey then
-                                                        ring = math.floor((plotKey - 1) / 10) + 1
-                                                    else
-                                                        warn("[Alpha Hub] Missing PlotKey attribute and number in name for child: " .. child.Name)
-                                                    end
+                                                    local plotKey = child:GetAttribute("PlotKey") or tonumber(child.Name:match("%d+")) or 1
+                                                    local ring = math.floor((plotKey - 1) / 10) + 1
                                                     
                                                     local stageAttr = "FarmPlotStage_" .. floorId
                                                     local farmPlotStage = farmPlot:GetAttribute(stageAttr) or myPlot:GetAttribute(stageAttr) or 1
@@ -702,7 +735,99 @@ local function addFloorSection(floorId, displayName)
             end,
         })
         
+        local AutoPlantBest = false
+        FloorTab:CreateToggle({
+            Name = "Auto Plant Best",
+            CurrentValue = false,
+            Flag = "AlphaAutoPlantBest_" .. floorId,
+            Callback = function(Value)
+                AutoPlantBest = Value
+                if AutoPlantBest then
+                    task.spawn(function()
+                        while AutoPlantBest and _G.AlphaScriptExecutionId == currentExecId do
+                            if not myPlot then myPlot = findMyPlot() end
+                            if myPlot then
+                                local farmPlot = findFarmPlot(floorId)
+                                if farmPlot then
+                                    local children = farmPlot:GetChildren()
+                                    
+                                    local bestTool = nil
+                                    local maxCost = -1
+                                    local toolsToSearch = {}
+                                    for _, t in ipairs(player.Backpack:GetChildren()) do
+                                        table.insert(toolsToSearch, t)
+                                    end
+                                    for _, t in ipairs(player.Character:GetChildren()) do
+                                        table.insert(toolsToSearch, t)
+                                    end
+                                    for _, tool in ipairs(toolsToSearch) do
+                                        if tool:IsA("Tool") and tool:GetAttribute("InventoryCategory") == "Seeds" then
+                                            local plantName = tool:GetAttribute("Plant")
+                                            local plantData = PlantsConfig[plantName]
+                                            local cost = plantData and plantData.Cost or 0
+                                            if cost > maxCost then
+                                                maxCost = cost
+                                                bestTool = tool
+                                            end
+                                        end
+                                    end
+                                    
+                                    local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+                                    local plantSeed = remotes and remotes:FindFirstChild("PlantSeed")
+                                    local removePlant = remotes and remotes:FindFirstChild("RemovePlant")
+                                    local equipTool = remotes and remotes:FindFirstChild("EquipTool")
+                                    
+                                    if plantSeed and removePlant then
+                                        local equippedBest = false
+                                        
+                                        for _, slot in ipairs(children) do
+                                            if not AutoPlantBest or _G.AlphaScriptExecutionId ~= currentExecId then break end
+                                            
+                                            local dirt = slot:FindFirstChild("Dirt")
+                                            local isUnlocked = slot:GetAttribute("Unlocked") == true
+                                            
+                                            if dirt and isUnlocked then
+                                                local crop = getSlotCrop(slot)
+                                                if crop then
+                                                    if isCropGrown(crop) then
+                                                        pcall(function()
+                                                            removePlant:FireServer(dirt)
+                                                        end)
+                                                        task.wait(0.1)
+                                                    end
+                                                else
+                                                    if bestTool then
+                                                        if not equippedBest then
+                                                            if bestTool.Parent ~= player.Character and equipTool then
+                                                                pcall(function()
+                                                                    equipTool:FireServer(bestTool)
+                                                                end)
+                                                                task.wait(0.1)
+                                                            end
+                                                            equippedBest = true
+                                                        end
+                                                        
+                                                        pcall(function()
+                                                            plantSeed:FireServer(dirt)
+                                                        end)
+                                                        task.wait(0.1)
+                                                    end
+                                                end
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                            task.wait(1)
+                        end
+                    end)
+                end
+            end,
+        })
+        
         task.wait(0.5)
+        
+        FloorTab:CreateSection("Auto Upgrades")
         
         for _, child in ipairs(surfaceGui:GetChildren()) do
             if child:IsA("GuiObject") then
