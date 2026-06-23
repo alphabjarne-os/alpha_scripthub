@@ -372,19 +372,6 @@ MainTab:CreateToggle({
                     local ring = math.floor((plotKey - 1) / 10) + 1
                     if ring > farmPlotStage then continue end
                     local cost = nil
-                    local rawCost = child:GetAttribute("Cost") or child:GetAttribute("Price") or child:GetAttribute("UnlockCost") or dirt:GetAttribute("Cost") or dirt:GetAttribute("Price") or dirt:GetAttribute("UnlockCost")
-                    if type(rawCost) == "number" then
-                        cost = rawCost
-                    elseif type(rawCost) == "string" then
-                        cost = parseShortenedNumber(rawCost)
-                    end
-                    if not cost or cost <= 0 then
-                        local lock = child:FindFirstChild("Lock")
-                        local textLabel = lock and lock:FindFirstChildWhichIsA("TextLabel", true)
-                        if textLabel then
-                            cost = parseShortenedNumber(textLabel.Text)
-                        end
-                    end
                     if not cost or cost <= 0 then
                         local floorData = Configuration and Configuration.FloorConfig and Configuration.FloorConfig[1]
                         if floorData then
