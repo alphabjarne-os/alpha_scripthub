@@ -127,13 +127,21 @@ local function addFloorSection(floorId, displayName)
                     end
                     
                     local titleObj = child:FindFirstChild("Title")
-                    local cleanDisplayName = titleObj and titleObj.Text or remoteUpgradeName
+                    local cleanDisplayName = ""
+                    
+                    if titleObj and titleObj:IsA("TextLabel") and titleObj.Text ~= "" then
+                        cleanDisplayName = "Auto Upgrade " .. titleObj.Text
+                    else
+                        local baseName = remoteUpgradeName:gsub("^Extra", "")
+                        baseName = baseName:gsub("(%u)", " %1"):gsub("^%s+", "")
+                        cleanDisplayName = "Auto Upgrade " .. baseName
+                    end
                     
                     local toggleKey = floorId .. "_" .. remoteUpgradeName
                     activeToggles[toggleKey] = false
                     
                     FloorTab:CreateToggle({
-                        Name = "Auto " .. cleanDisplayName,
+                        Name = cleanDisplayName,
                         CurrentValue = false,
                         Flag = "Flag_" .. toggleKey,
                         Callback = function(Value)
