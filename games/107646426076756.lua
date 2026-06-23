@@ -5,8 +5,6 @@ local myPlot = nil
 local AntiAFKEnabled = false
 
 
---test
-
 local virtualUser = game:GetService("VirtualUser")
 player.Idled:Connect(function()
     if AntiAFKEnabled then
