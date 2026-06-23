@@ -103,6 +103,31 @@ local RollAnimationDoneEvent = game:GetService("ReplicatedStorage"):WaitForChild
 
 local AutoRollEnabled = false
 
+local rollConnection
+rollConnection = RollSeedsEvent.OnClientEvent:Connect(function(arg1, arg2)
+    if _G.AlphaScriptExecutionId ~= currentExecId then
+        if rollConnection then
+            rollConnection:Disconnect()
+        end
+        return
+    end
+    
+    if not AutoRollEnabled then return end
+    
+    local rollId = nil
+    if type(arg1) == "table" then
+        rollId = arg1.RollId
+    elseif type(arg1) == "number" then
+        rollId = arg1
+    end
+    
+    if rollId then
+        pcall(function()
+            RollAnimationDoneEvent:FireServer(rollId)
+        end)
+    end
+end)
+
 MainTab:CreateToggle({
     Name = "Auto Roll",
     CurrentValue = false,
@@ -118,42 +143,20 @@ MainTab:CreateToggle({
                         continue
                     end
                     
-                    local lastRollId = seedRoller:GetAttribute("RollId") or seedRoller:GetAttribute("RollID") or seedRoller:GetAttribute("CurrentRollId") or seedRoller:GetAttribute("RollId")
                     local lastSeed = seedRoller:GetAttribute("RolledSeed1")
                     
                     pcall(function()
                         RollSeedsEvent:FireServer()
                     end)
                     
-                    local rollId = nil
-                    local success = false
                     local elapsed = 0
-                    
-                    while elapsed < 4 and AutoRollEnabled and _G.AlphaScriptExecutionId == currentExecId do
-                        local currentRollId = seedRoller:GetAttribute("RollId") or seedRoller:GetAttribute("RollID") or seedRoller:GetAttribute("CurrentRollId") or seedRoller:GetAttribute("RollId")
+                    while elapsed < 5 and AutoRollEnabled and _G.AlphaScriptExecutionId == currentExecId do
                         local currentSeed = seedRoller:GetAttribute("RolledSeed1")
-                        
-                        if (currentRollId and currentRollId ~= lastRollId) or (currentSeed and currentSeed ~= "" and currentSeed ~= lastSeed) then
-                            rollId = currentRollId
-                            success = true
+                        if currentSeed and currentSeed ~= "" and currentSeed ~= lastSeed then
                             break
                         end
-                        
                         task.wait(0.1)
                         elapsed = elapsed + 0.1
-                    end
-                    
-                    if success then
-                        local attrs = seedRoller:GetAttributes()
-                        for k, v in pairs(attrs) do
-                            print("[Alpha Hub] Attribute: " .. tostring(k) .. " = " .. tostring(v))
-                        end
-                        
-                        if rollId then
-                            pcall(function()
-                                RollAnimationDoneEvent:FireServer(rollId)
-                            end)
-                        end
                     end
                     
                     task.wait(1)
