@@ -92,6 +92,61 @@ MainTab:CreateToggle({
 })
 
 local activeToggles = {}
+local registeredUpgrades = {}
+
+task.spawn(function()
+    while _G.AlphaScriptExecutionId == currentExecId do
+        local anyActive = false
+        for _, active in pairs(activeToggles) do
+            if active then
+                anyActive = true
+                break
+            end
+        end
+        
+        if anyActive then
+            if not myPlot then myPlot = findMyPlot() end
+            if myPlot then
+                local sign = myPlot:FindFirstChild("PlotUpgradeSign")
+                local screen = sign and sign:FindFirstChild("Screen")
+                local surfaceGui = screen and screen:FindFirstChild("SurfaceGui")
+                
+                if surfaceGui then
+                    local currentMoney = getMyMoney()
+                    local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+                    local remote = remotes and remotes:FindFirstChild("PlotUpgradeTransaction")
+                    
+                    if remote then
+                        for toggleKey, active in pairs(activeToggles) do
+                            if active and _G.AlphaScriptExecutionId == currentExecId then
+                                local upgradeInfo = registeredUpgrades[toggleKey]
+                                if upgradeInfo then
+                                    local frame = surfaceGui:FindFirstChild(upgradeInfo.uiFrameName)
+                                    local btn = frame and frame:FindFirstChild("Btn")
+                                    local txt = btn and btn:FindFirstChild("Txt")
+                                    
+                                    if txt then
+                                        local price = parseShortenedNumber(txt.Text)
+                                        if price > 0 and currentMoney >= price then
+                                            local success, err = pcall(function()
+                                                remote:InvokeServer(upgradeInfo.remoteUpgradeName, upgradeInfo.floorId)
+                                            end)
+                                            if success then
+                                                currentMoney = currentMoney - price
+                                                task.wait(0.1)
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        task.wait(0.5)
+    end
+end)
 
 local function addFloorSection(floorId, displayName)
     task.spawn(function()
@@ -144,40 +199,18 @@ local function addFloorSection(floorId, displayName)
                     local toggleKey = floorId .. "_" .. remoteUpgradeName
                     activeToggles[toggleKey] = false
                     
+                    registeredUpgrades[toggleKey] = {
+                        uiFrameName = uiFrameName,
+                        remoteUpgradeName = remoteUpgradeName,
+                        floorId = floorId
+                    }
+                    
                     FloorTab:CreateToggle({
                         Name = cleanDisplayName,
                         CurrentValue = false,
                         Flag = "Flag_" .. toggleKey,
                         Callback = function(Value)
                             activeToggles[toggleKey] = Value
-                            if Value then
-                                task.spawn(function()
-                                    while activeToggles[toggleKey] and _G.AlphaScriptExecutionId == currentExecId do
-                                        if not myPlot then myPlot = findMyPlot() end
-                                        if myPlot then
-                                            local currentSign = myPlot:FindFirstChild("PlotUpgradeSign")
-                                            local currentGui = currentSign and currentSign:FindFirstChild("Screen") and currentSign.Screen:FindFirstChild("SurfaceGui")
-                                            local currentFrame = currentGui and currentGui:FindFirstChild(uiFrameName)
-                                            
-                                            if currentFrame and currentFrame:FindFirstChild("Btn") and currentFrame.Btn:FindFirstChild("Txt") then
-                                                local price = parseShortenedNumber(currentFrame.Btn.Txt.Text)
-                                                local currentMoney = getMyMoney()
-                                                print(price, currentMoney)
-                                                
-                                                if price > 0 and currentMoney >= price then
-                                                    local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
-                                                    local remote = remotes and remotes:FindFirstChild("PlotUpgradeTransaction")
-                                                    if remote then
-                                                        remote:InvokeServer(remoteUpgradeName, floorId)
-                                                        task.wait(.5)
-                                                    end
-                                                end
-                                            end
-                                        end
-                                        task.wait(1)
-                                    end
-                                end)
-                            end
                         end
                     })
                 end
