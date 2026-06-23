@@ -268,7 +268,6 @@ MainTab:CreateToggle({
                                                         cost = 0
                                                     end
                                                 end
-                                                print(string.format("[Alpha Hub] Ground check - Name: %s, PlotKey: %s, Ring: %d, Stage: %d, Cost: %s, Cash: %s", child.Name, tostring(plotKey), ring, farmPlotStage, tostring(cost), tostring(currentMoney)))
                                                 if cost and cost > 0 and currentMoney >= cost then
                                                     pcall(function()
                                                         unlockPlot:FireServer(dirt)
@@ -1026,7 +1025,7 @@ task.spawn(function()
                             end)
                         end
                     end
-                end})
+                })
             end
         end
     end
