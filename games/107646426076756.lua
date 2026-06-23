@@ -1000,6 +1000,7 @@ MainTab:CreateToggle({
     CurrentValue = false,
     Flag = "AlphaAutoDetectRarities",
     Callback = function(Value)
+        print("[Alpha Hub] Auto-Detect Best Rarity Toggled:", Value)
         AutoDetectRarities = Value
         task.spawn(checkAndBuySeeds)
     end,
@@ -1009,28 +1010,33 @@ local DetectedRarityParagraph = MainTab:CreateParagraph({Title = "Auto-Detect St
 
 task.spawn(function()
     while _G.AlphaScriptExecutionId == currentExecId do
-        if AutoDetectRarities then
-            local currentMoney = getMyMoney()
-            local maxAffordableCost = 0
-            local bestPlant = nil
-            local bestPlantName = "None"
-            for name, pData in pairs(PlantsConfig) do
-                if pData.Cost and pData.Cost <= currentMoney then
-                    if pData.Cost > maxAffordableCost then
-                        maxAffordableCost = pData.Cost
-                        bestPlant = pData
-                        bestPlantName = name
+        local success, err = pcall(function()
+            if AutoDetectRarities then
+                local currentMoney = getMyMoney()
+                local maxAffordableCost = 0
+                local bestPlant = nil
+                local bestPlantName = "None"
+                for name, pData in pairs(PlantsConfig) do
+                    if pData.Cost and pData.Cost <= currentMoney then
+                        if pData.Cost > maxAffordableCost then
+                            maxAffordableCost = pData.Cost
+                            bestPlant = pData
+                            bestPlantName = name
+                        end
                     end
                 end
-            end
-            
-            if bestPlant then
-                DetectedRarityParagraph:Set({Title = "Auto-Detect Status", Content = "Auto-Detect: " .. tostring(bestPlant.Rarity) .. " (" .. tostring(bestPlantName) .. ")"})
+                
+                if bestPlant then
+                    DetectedRarityParagraph:Set({Title = "Auto-Detect Status", Content = "Auto-Detect: " .. tostring(bestPlant.Rarity) .. " (" .. tostring(bestPlantName) .. ")"})
+                else
+                    DetectedRarityParagraph:Set({Title = "Auto-Detect Status", Content = "Auto-Detect: None (Insufficient Cash)"})
+                end
             else
-                DetectedRarityParagraph:Set({Title = "Auto-Detect Status", Content = "Auto-Detect: None (Insufficient Cash)"})
+                DetectedRarityParagraph:Set({Title = "Auto-Detect Status", Content = "Auto-Detect: Disabled"})
             end
-        else
-            DetectedRarityParagraph:Set({Title = "Auto-Detect Status", Content = "Auto-Detect: Disabled"})
+        end)
+        if not success then
+            warn("[Alpha Hub] Error in Auto-Detect loop: " .. tostring(err))
         end
         task.wait(1)
     end
