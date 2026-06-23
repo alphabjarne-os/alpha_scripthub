@@ -158,6 +158,7 @@ local function addFloorSection(floorId, displayName)
                                             if currentFrame and currentFrame:FindFirstChild("Btn") and currentFrame.Btn:FindFirstChild("Txt") then
                                                 local price = parseShortenedNumber(currentFrame.Btn.Txt.Text)
                                                 local currentMoney = getMyMoney()
+                                                print(price, currentMoney)
                                                 
                                                 if price > 0 and currentMoney >= price then
                                                     local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
