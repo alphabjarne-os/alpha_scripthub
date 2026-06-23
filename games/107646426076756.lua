@@ -340,58 +340,101 @@ MainTab:CreateToggle({
             while AutoUnlockGround and _G.AlphaScriptExecutionId == currentExecId do
                 if not myPlot then myPlot = findMyPlot() end
                 if not unlockPlotRemote then unlockPlotRemote = Remotes and Remotes:FindFirstChild("UnlockPlot") end
-                local farmPlot = myPlot and myPlot:FindFirstChild("FarmPlot")
-                if not farmPlot or not unlockPlotRemote then 
+                if not myPlot or not unlockPlotRemote then 
                     task.wait(1)
                     continue 
                 end
-                local children = farmPlot:GetChildren()
-                table.sort(children, function(a, b)
-                    local numA = tonumber(a.Name:match("%d+")) or 0
-                    local numB = tonumber(b.Name:match("%d+")) or 0
-                    return numA < numB
-                end)
-                local farmPlotStage = farmPlot:GetAttribute("FarmPlotStage") or farmPlot:GetAttribute("Stage") or myPlot:GetAttribute("FarmPlotStage_Floor1") or myPlot:GetAttribute("Stage_Floor1") or 1
-                local totalUnlocked = 0
-                for _, child in ipairs(children) do
-                    if child:GetAttribute("Unlocked") == true then
-                        totalUnlocked = totalUnlocked + 1
-                    end
+                
+                local activePlots = {}
+                local fp1 = myPlot:FindFirstChild("FarmPlot")
+                if fp1 then
+                    table.insert(activePlots, {plot = fp1, floorIndex = 1})
                 end
-                for _, child in ipairs(children) do
-                    if not AutoUnlockGround or _G.AlphaScriptExecutionId ~= currentExecId then break end
-                    local dirt = child:FindFirstChild("Dirt")
-                    if not dirt then continue end
-                    local isUnlocked = child:GetAttribute("Unlocked")
-                    local isLocked
-                    if isUnlocked ~= nil then
-                        isLocked = not isUnlocked
-                    else
-                        isLocked = child:GetAttribute("Locked")
-                        if isLocked == nil then isLocked = child:GetAttribute("IsLocked") end
-                        if isLocked == nil then 
-                            isLocked = child:FindFirstChild("Lock") ~= nil or (dirt.Transparency > 0.1) 
+                for _, child in ipairs(myPlot:GetChildren()) do
+                    local fNum = child.Name:match("^Floor(%d+)$")
+                    if fNum then
+                        local fp = child:FindFirstChild("FarmPlot")
+                        if fp then
+                            table.insert(activePlots, {plot = fp, floorIndex = tonumber(fNum)})
                         end
                     end
-                    if not isLocked then continue end
-                    local ring = tonumber(child.Name:match("%d+")) or 1
-                    if ring > farmPlotStage then continue end
-                    local cost = 0
-                    local floorData = Configuration and Configuration.FloorConfig and Configuration.FloorConfig[1]
-                    if floorData then
-                        local bases = floorData.PlotUnlockBase
-                        local growth = floorData.PlotUnlockGrowth or 1.4
-                        local base = bases and (bases[ring] or bases[#bases] or 25) or 25
-                        cost = base * (growth ^ totalUnlocked)
+                end
+                
+                table.sort(activePlots, function(a, b)
+                    return a.floorIndex < b.floorIndex
+                end)
+                
+                if #activePlots == 0 then
+                    task.wait(1)
+                    continue
+                end
+                
+                local boughtSomething = false
+                for _, plotData in ipairs(activePlots) do
+                    local farmPlot = plotData.plot
+                    local floorIndex = plotData.floorIndex
+                    local children = farmPlot:GetChildren()
+                    table.sort(children, function(a, b)
+                        local numA = tonumber(a.Name:match("%d+")) or 0
+                        local numB = tonumber(b.Name:match("%d+")) or 0
+                        return numA < numB
+                    end)
+                    
+                    local farmPlotStage = farmPlot:GetAttribute("FarmPlotStage") or farmPlot:GetAttribute("Stage")
+                    if not farmPlotStage then
+                        if floorIndex == 1 then
+                            farmPlotStage = myPlot:GetAttribute("FarmPlotStage") or myPlot:GetAttribute("FarmPlotStage_Floor1") or myPlot:GetAttribute("Stage_Floor1")
+                        else
+                            farmPlotStage = myPlot:GetAttribute("FarmPlotStage_Floor" .. floorIndex) or myPlot:GetAttribute("Stage_Floor" .. floorIndex)
+                        end
                     end
-                    if cost <= 0 then continue end
-                    local rawMoney = getMyMoney()
-                    local currentMoney = type(rawMoney) == "number" and rawMoney or parseShortenedNumber(tostring(rawMoney)) or 0
-                    if currentMoney >= cost then
-                        pcall(function()
-                            unlockPlotRemote:FireServer(dirt)
-                        end)
-                        task.wait(0.1)
+                    farmPlotStage = farmPlotStage or 1
+                    
+                    local totalUnlocked = 0
+                    for _, child in ipairs(children) do
+                        if child:GetAttribute("Unlocked") == true then
+                            totalUnlocked = totalUnlocked + 1
+                        end
+                    end
+                    for _, child in ipairs(children) do
+                        if not AutoUnlockGround or _G.AlphaScriptExecutionId ~= currentExecId then break end
+                        local dirt = child:FindFirstChild("Dirt")
+                        if not dirt then continue end
+                        local isUnlocked = child:GetAttribute("Unlocked")
+                        local isLocked
+                        if isUnlocked ~= nil then
+                            isLocked = not isUnlocked
+                        else
+                            isLocked = child:GetAttribute("Locked")
+                            if isLocked == nil then isLocked = child:GetAttribute("IsLocked") end
+                            if isLocked == nil then 
+                                isLocked = child:FindFirstChild("Lock") ~= nil or (dirt.Transparency > 0.1) 
+                            end
+                        end
+                        if not isLocked then continue end
+                        local ring = tonumber(child.Name:match("%d+")) or 1
+                        if ring > farmPlotStage then continue end
+                        local cost = 0
+                        local floorData = Configuration and Configuration.FloorConfig and Configuration.FloorConfig[floorIndex]
+                        if floorData then
+                            local bases = floorData.PlotUnlockBase
+                            local growth = floorData.PlotUnlockGrowth or 1.4
+                            local base = bases and (bases[ring] or bases[#bases] or 25) or 25
+                            cost = base * (growth ^ totalUnlocked)
+                        end
+                        if cost <= 0 then continue end
+                        local rawMoney = getMyMoney()
+                        local currentMoney = type(rawMoney) == "number" and rawMoney or parseShortenedNumber(tostring(rawMoney)) or 0
+                        if currentMoney >= cost then
+                            pcall(function()
+                                unlockPlotRemote:FireServer(dirt)
+                            end)
+                            boughtSomething = true
+                            task.wait(0.1)
+                            break
+                        end
+                    end
+                    if boughtSomething then
                         break
                     end
                 end
@@ -413,9 +456,21 @@ MainTab:CreateToggle({
                 while AutoPlantBest and _G.AlphaScriptExecutionId == currentExecId do
                     if not myPlot then myPlot = findMyPlot() end
                     if myPlot then
-                        local farmPlot = myPlot:FindFirstChild("FarmPlot")
-                        if farmPlot then
-                            local children = farmPlot:GetChildren()
+                        local activePlots = {}
+                        local fp1 = myPlot:FindFirstChild("FarmPlot")
+                        if fp1 then
+                            table.insert(activePlots, fp1)
+                        end
+                        for _, child in ipairs(myPlot:GetChildren()) do
+                            if child.Name:match("^Floor%d+$") then
+                                local fp = child:FindFirstChild("FarmPlot")
+                                if fp then
+                                    table.insert(activePlots, fp)
+                                end
+                            end
+                        end
+                        
+                        if #activePlots > 0 then
                             local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
                             local plantSeed = remotes and remotes:FindFirstChild("PlantSeed")
                             local removePlant = remotes and remotes:FindFirstChild("RemovePlant")
@@ -448,21 +503,23 @@ MainTab:CreateToggle({
                                         break
                                     end
                                     local slots = {}
-                                    for _, slot in ipairs(children) do
-                                        local dirt = slot:FindFirstChild("Dirt")
-                                        local isUnlocked = slot:GetAttribute("Unlocked") == true
-                                        if dirt and isUnlocked then
-                                            local crop = getSlotCrop(slot)
-                                            local cropName = crop and (crop:GetAttribute("Plant") or crop.Name) or nil
-                                            local plantData = cropName and PlantsConfig[cropName]
-                                            local cropCost = plantData and plantData.Cost or 0
-                                            local isGrown = crop and isCropGrown(crop) or false
-                                            table.insert(slots, {
-                                                dirt = dirt,
-                                                crop = crop,
-                                                cropCost = cropCost,
-                                                isGrown = isGrown
-                                            })
+                                    for _, farmPlot in ipairs(activePlots) do
+                                        for _, slot in ipairs(farmPlot:GetChildren()) do
+                                            local dirt = slot:FindFirstChild("Dirt")
+                                            local isUnlocked = slot:GetAttribute("Unlocked") == true
+                                            if dirt and isUnlocked then
+                                                local crop = getSlotCrop(slot)
+                                                local cropName = crop and (crop:GetAttribute("Plant") or crop.Name) or nil
+                                                local plantData = cropName and PlantsConfig[cropName]
+                                                local cropCost = plantData and plantData.Cost or 0
+                                                local isGrown = crop and isCropGrown(crop) or false
+                                                table.insert(slots, {
+                                                    dirt = dirt,
+                                                    crop = crop,
+                                                    cropCost = cropCost,
+                                                    isGrown = isGrown
+                                                })
+                                            end
                                         end
                                     end
                                     table.sort(slots, function(a, b)
