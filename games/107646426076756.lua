@@ -91,6 +91,52 @@ MainTab:CreateToggle({
     end,
 })
 
+MainTab:CreateSection("Auto Roll")
+
+local RollSeedsEvent = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("RollSeeds")
+local RollAnimationDoneEvent = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("RollAnimationDone")
+
+local AutoRollEnabled = false
+
+local rollConnection
+rollConnection = RollSeedsEvent.OnClientEvent:Connect(function(data)
+    if _G.AlphaScriptExecutionId ~= currentExecId then
+        if rollConnection then
+            rollConnection:Disconnect()
+        end
+        return
+    end
+    
+    if not AutoRollEnabled then return end
+    if not data or not data.RollId then return end
+    
+    local rollId = data.RollId
+    pcall(function()
+        RollAnimationDoneEvent:FireServer(rollId)
+    end)
+    
+    if AutoRollEnabled and _G.AlphaScriptExecutionId == currentExecId then
+        task.wait(1)
+        pcall(function()
+            RollSeedsEvent:FireServer()
+        end)
+    end
+end)
+
+MainTab:CreateToggle({
+    Name = "Auto Roll",
+    CurrentValue = false,
+    Flag = "AlphaAutoRollToggle",
+    Callback = function(Value)
+        AutoRollEnabled = Value
+        if AutoRollEnabled then
+            pcall(function()
+                RollSeedsEvent:FireServer()
+            end)
+        end
+    end,
+})
+
 local activeToggles = {}
 local registeredUpgrades = {}
 
