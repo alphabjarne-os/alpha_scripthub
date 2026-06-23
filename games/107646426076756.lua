@@ -85,53 +85,6 @@ end
 
 local Configuration = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Configuration"))
 
-local function getMainUpgradeInfo(upgradeName)
-    local level = 1
-    local price = 0
-    if not myPlot then myPlot = findMyPlot() end
-    if myPlot then
-        local sign = myPlot:FindFirstChild("UpgradeSign")
-        local screen = sign and sign:FindFirstChild("Screen")
-        local surfaceGui = screen and screen:FindFirstChild("SurfaceGui")
-        if surfaceGui then
-            local frameName = upgradeName
-            if upgradeName == "UpgradeSeedRolls" then
-                frameName = "SeedStands"
-            elseif upgradeName == "UpgradeSeedLuck" then
-                frameName = "SeedLuck"
-            elseif upgradeName == "UpgradeFarm" then
-                frameName = "UpgradeFarm"
-                if not surfaceGui:FindFirstChild(frameName) then
-                    frameName = "Expand"
-                end
-                if not surfaceGui:FindFirstChild(frameName) then
-                    frameName = "Farm"
-                end
-            end
-            local frame = surfaceGui:FindFirstChild(frameName)
-            if frame then
-                local btn = frame:FindFirstChild("Btn")
-                local txt = btn and btn:FindFirstChild("Txt")
-                if txt then
-                    price = parseShortenedNumber(txt.Text)
-                end
-                if upgradeName == "UpgradeSeedLuck" then
-                    local desc = frame:FindFirstChild("Desc")
-                    if desc then
-                        level = tonumber(desc.Text:match("(%d+)")) or 1
-                    end
-                elseif upgradeName == "UpgradeSeedRolls" then
-                    level = myPlot:GetAttribute("SeedStands") or 1
-                elseif upgradeName == "UpgradeFarm" then
-                    local farmPlot = myPlot:FindFirstChild("FarmPlot")
-                    level = farmPlot and farmPlot:GetAttribute("FarmPlotStage") or 1
-                end
-            end
-        end
-    end
-    return price, level
-end
-
 local MainTab = Window:CreateTab("Main", 4483362458)
 MainTab:CreateSection("Automation")
 
@@ -184,12 +137,10 @@ MainTab:CreateToggle({
                     if not myPlot then myPlot = findMyPlot() end
                     if myPlot then
                         local currentMoney = getMyMoney()
-                        local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
-                        local price, level = getMainUpgradeInfo("UpgradeSeedRolls")
-                        if price == 0 then
-                            price = Configuration and Configuration.ExtraSeedRollsCosts and Configuration.ExtraSeedRollsCosts[level + 1] or 0
-                        end
+                        local level = myPlot:GetAttribute("SeedStands") or 1
+                        local price = Configuration and Configuration.ExtraSeedRollsCosts and Configuration.ExtraSeedRollsCosts[level + 1] or 0
                         if price > 0 and currentMoney >= price then
+                            local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
                             local remote = remotes and remotes:FindFirstChild("UpgradeSeedRolls")
                             if remote then
                                 local success, err = pcall(function()
@@ -198,8 +149,6 @@ MainTab:CreateToggle({
                                 if not success then
                                     warn("[Alpha Hub] Failed to upgrade Seed Rolls: " .. tostring(err))
                                 end
-                            else
-                                warn("[Alpha Hub] UpgradeSeedRolls remote function not found!")
                             end
                         end
                     end
@@ -223,12 +172,32 @@ MainTab:CreateToggle({
                     if not myPlot then myPlot = findMyPlot() end
                     if myPlot then
                         local currentMoney = getMyMoney()
-                        local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
-                        local price, level = getMainUpgradeInfo("UpgradeSeedLuck")
-                        if price == 0 then
-                            price = math.floor(60 * (1.35 ^ (level - 1)))
+                        local level = 1
+                        local price = 0
+                        local sign = myPlot:FindFirstChild("UpgradeSign")
+                        local screen = sign and sign:FindFirstChild("Screen")
+                        local surfaceGui = screen and screen:FindFirstChild("SurfaceGui")
+                        if surfaceGui then
+                            local seedLuck = surfaceGui:FindFirstChild("SeedLuck", true)
+                            if seedLuck then
+                                local desc = seedLuck:FindFirstChild("Desc", true)
+                                if desc then
+                                    level = tonumber(desc.Text:match("(%d+)")) or 1
+                                end
+                                local btn = seedLuck:FindFirstChild("Btn", true)
+                                local txt = btn and btn:FindFirstChild("Txt", true)
+                                if txt then
+                                    price = parseShortenedNumber(txt.Text)
+                                end
+                            end
+                        end
+                        if price <= 0 then
+                            local base = Configuration and Configuration.BaseSeedLuckUpgradeCost or 60
+                            local growth = Configuration and Configuration.ExtraPowerGrowth or 1.35
+                            price = math.floor(base * (growth ^ (level - 1)))
                         end
                         if price > 0 and currentMoney >= price then
+                            local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
                             local remote = remotes and remotes:FindFirstChild("UpgradeSeedLuck")
                             if remote then
                                 local success, err = pcall(function()
@@ -237,8 +206,6 @@ MainTab:CreateToggle({
                                 if not success then
                                     warn("[Alpha Hub] Failed to upgrade Seed Luck: " .. tostring(err))
                                 end
-                            else
-                                warn("[Alpha Hub] UpgradeSeedLuck remote function not found!")
                             end
                         end
                     end
@@ -262,12 +229,11 @@ MainTab:CreateToggle({
                     if not myPlot then myPlot = findMyPlot() end
                     if myPlot then
                         local currentMoney = getMyMoney()
-                        local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
-                        local price, level = getMainUpgradeInfo("UpgradeFarm")
-                        if price == 0 then
-                            price = Configuration and Configuration.FarmExpandCosts and Configuration.FarmExpandCosts[level + 1] or 0
-                        end
+                        local farmPlot = myPlot:FindFirstChild("FarmPlot")
+                        local level = farmPlot and (farmPlot:GetAttribute("FarmPlotStage") or farmPlot:GetAttribute("Stage")) or 1
+                        local price = Configuration and Configuration.FarmExpandCosts and Configuration.FarmExpandCosts[level + 1] or 0
                         if price > 0 and currentMoney >= price then
+                            local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
                             local remote = remotes and remotes:FindFirstChild("UpgradeFarm")
                             if remote then
                                 local success, err = pcall(function()
@@ -276,8 +242,6 @@ MainTab:CreateToggle({
                                 if not success then
                                     warn("[Alpha Hub] Failed to upgrade Farm: " .. tostring(err))
                                 end
-                            else
-                                warn("[Alpha Hub] UpgradeFarm remote function not found!")
                             end
                         end
                     end
