@@ -96,6 +96,7 @@ local isProcessingRoll = false
 local lastSlotsData = nil
 
 local SelectedRarities = {}
+local AutoDetectRarities = false
 local sortedRarities = {}
 local seenRarities = {}
 
@@ -756,7 +757,7 @@ local function shouldAutoBuySeed(seedName, currentMoney)
     local plantData = PlantsConfig[seedName]
     if not plantData then return false end
     
-    if SelectedRarities["auto-detect"] then
+    if AutoDetectRarities then
         local maxAffordableCost = 0
         local bestPlant = nil
         for name, pData in pairs(PlantsConfig) do
@@ -993,8 +994,18 @@ MainTab:CreateToggle({
 
 MainTab:CreateSection("Auto Buy Rarities")
 
+MainTab:CreateToggle({
+    Name = "Auto-Detect Best Rarity",
+    Info = "Overrides Auto Buy Rarities",
+    CurrentValue = false,
+    Flag = "AlphaAutoDetectRarities",
+    Callback = function(Value)
+        AutoDetectRarities = Value
+        task.spawn(checkAndBuySeeds)
+    end,
+})
+
 local rarityOptions = {}
-table.insert(rarityOptions, "Auto-Detect")
 table.insert(rarityOptions, "Other")
 for _, rarityInfo in ipairs(sortedRarities) do
     table.insert(rarityOptions, rarityInfo.Name)
