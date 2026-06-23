@@ -4,8 +4,8 @@ local player = game.Players.LocalPlayer
 local myPlot = nil
 
 local function findMyPlot()
-    local map = workspace:WaitForChild("Map", 10)
-    local plots = map and map:WaitForChild("Plots", 10)
+    local map = workspace:FindFirstChild("Map")
+    local plots = map and map:FindFirstChild("Plots")
     if plots and player then
         for _, plot in ipairs(plots:GetChildren()) do
             if plot:GetAttribute("OwnerUserId") == player.UserId then
@@ -101,18 +101,16 @@ local function addFloorSection(floorId, displayName)
             task.wait(0.5)
         end
         
-        if not myPlot then return end
+        if _G.AlphaScriptExecutionId ~= currentExecId or not myPlot then return end
         
-        local floorObj = myPlot:WaitForChild(floorId, 15)
-        if not floorObj then return end
-        
-        local sign = floorObj:WaitForChild("PlotUpgradeSign", 15)
-        local screen = sign and sign:WaitForChild("Screen", 15)
-        local surfaceGui = screen and screen:WaitForChild("SurfaceGui", 15)
+        local sign = myPlot:WaitForChild("PlotUpgradeSign", 10)
+        local screen = sign and sign:WaitForChild("Screen", 10)
+        local surfaceGui = screen and screen:WaitForChild("SurfaceGui", 10)
         
         if not surfaceGui then return end
         
-        MainTab:CreateSection("Auto Upgrade (" .. displayName .. ")")
+        local FloorTab = Window:CreateTab(displayName, 4483362458)
+        FloorTab:CreateSection(displayName .. " Upgrades")
         
         task.wait(0.5)
         
@@ -131,7 +129,7 @@ local function addFloorSection(floorId, displayName)
                     local toggleKey = floorId .. "_" .. remoteUpgradeName
                     activeToggles[toggleKey] = false
                     
-                    MainTab:CreateToggle({
+                    FloorTab:CreateToggle({
                         Name = "Auto " .. remoteUpgradeName .. " Upgrade",
                         CurrentValue = false,
                         Flag = "Flag_" .. toggleKey,
@@ -142,8 +140,7 @@ local function addFloorSection(floorId, displayName)
                                     while activeToggles[toggleKey] and _G.AlphaScriptExecutionId == currentExecId do
                                         if not myPlot then myPlot = findMyPlot() end
                                         if myPlot then
-                                            local currentFloorObj = myPlot:FindFirstChild(floorId)
-                                            local currentSign = currentFloorObj and currentFloorObj:FindFirstChild("PlotUpgradeSign")
+                                            local currentSign = myPlot:FindFirstChild("PlotUpgradeSign")
                                             local currentGui = currentSign and currentSign:FindFirstChild("Screen") and currentSign.Screen:FindFirstChild("SurfaceGui")
                                             local currentFrame = currentGui and currentGui:FindFirstChild(uiFrameName)
                                             
@@ -174,6 +171,3 @@ local function addFloorSection(floorId, displayName)
 end
 
 addFloorSection("Floor1", "Floor 1")
-addFloorSection("Floor2", "Floor 2")
-addFloorSection("Floor3", "Floor 3")
-addFloorSection("Floor4", "Floor 4")
