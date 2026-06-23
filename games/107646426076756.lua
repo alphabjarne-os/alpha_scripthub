@@ -169,7 +169,7 @@ local function addFloorSection(floorId, displayName)
                                                     local remote = remotes and remotes:FindFirstChild("PlotUpgradeTransaction")
                                                     if remote then
                                                         remote:InvokeServer(remoteUpgradeName, floorId)
-                                                        task.wait(1.5)
+                                                        task.wait(.5)
                                                     end
                                                 end
                                             end
