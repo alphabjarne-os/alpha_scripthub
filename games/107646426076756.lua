@@ -132,6 +132,7 @@ local AutoRollEnabled = false
 local currentRollId = nil
 local isProcessingRoll = false
 local lastSlotsData = nil
+local SkipAnimationEnabled = false
 
 local SelectedRarities = {}
 local sortedRarities = {}
@@ -247,30 +248,31 @@ rollConnection = RollSeedsEvent.OnClientEvent:Connect(function(arg1, arg2)
                 prompt = roller:FindFirstChildWhichIsA("ProximityPrompt", true)
             end
             
-            local isSkipped = true
-            if prompt then
-                local startCheck = tick()
-                while prompt.Enabled and tick() - startCheck < 0.15 do
-                    task.wait()
-                end
-                if not prompt.Enabled then
-                    isSkipped = false
-                    local completed = false
-                    local conn
-                    conn = prompt:GetPropertyChangedSignal("Enabled"):Connect(function()
-                        if prompt.Enabled then
-                            completed = true
-                            if conn then conn:Disconnect() end
-                        end
-                    end)
-                    local start = tick()
-                    while not completed and tick() - start < 3 do
-                        task.wait(0.05)
+            local isSkipped = SkipAnimationEnabled
+            if not isSkipped then
+                if prompt then
+                    local startCheck = tick()
+                    while prompt.Enabled and tick() - startCheck < 0.5 do
+                        task.wait()
                     end
-                    if conn then conn:Disconnect() end
+                    if not prompt.Enabled then
+                        local completed = false
+                        local conn
+                        conn = prompt:GetPropertyChangedSignal("Enabled"):Connect(function()
+                            if prompt.Enabled then
+                                completed = true
+                                if conn then conn:Disconnect() end
+                            end
+                        end)
+                        local start = tick()
+                        while not completed and tick() - start < 3 do
+                            task.wait(0.05)
+                        end
+                        if conn then conn:Disconnect() end
+                    end
+                else
+                    task.wait(1.5)
                 end
-            else
-                task.wait(1.5)
             end
             
             if not isSkipped then
@@ -366,6 +368,15 @@ MainTab:CreateToggle({
                 end
             end)
         end
+    end,
+})
+
+MainTab:CreateToggle({
+    Name = "Skip Animation",
+    CurrentValue = false,
+    Flag = "AlphaSkipAnimationToggle",
+    Callback = function(Value)
+        SkipAnimationEnabled = Value
     end,
 })
 
