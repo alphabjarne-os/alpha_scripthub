@@ -161,6 +161,13 @@ end
 local function findFarmPlot(floorId)
     if not myPlot then myPlot = findMyPlot() end
     if not myPlot then return nil end
+    
+    local container = myPlot:FindFirstChild(floorId)
+    if container then
+        local fp = container:FindFirstChild("FarmPlot")
+        if fp then return fp end
+    end
+    
     local targetName = "FarmPlot"
     if floorId ~= "Floor1" then
         targetName = "FarmPlot_" .. floorId
@@ -169,8 +176,12 @@ local function findFarmPlot(floorId)
     if fp then return fp end
     fp = myPlot:FindFirstChild("FarmPlot" .. floorId)
     if fp then return fp end
-    fp = myPlot:FindFirstChild("FarmPlot")
-    if fp then return fp end
+    
+    if floorId == "Floor1" then
+        fp = myPlot:FindFirstChild("FarmPlot")
+        if fp then return fp end
+    end
+    
     for _, child in ipairs(myPlot:GetChildren()) do
         local name = child.Name:lower()
         if name:find("farmplot") and name:find(floorId:lower()) then
@@ -330,7 +341,7 @@ local AutoUnlockGround = false
 MainTab:CreateToggle({
     Name = "Auto Buy Ground",
     CurrentValue = false,
-    Flag = "AlphaAutoBuyGround_Floor1",
+    Flag = "AlphaAutoBuyGround",
     Callback = function(Value)
         AutoUnlockGround = Value
         if not AutoUnlockGround then return end
@@ -346,14 +357,14 @@ MainTab:CreateToggle({
                 end
                 
                 local activePlots = {}
-                local fp1 = myPlot:FindFirstChild("FarmPlot")
+                local fp1 = findFarmPlot("Floor1")
                 if fp1 then
                     table.insert(activePlots, {plot = fp1, floorIndex = 1})
                 end
                 for _, child in ipairs(myPlot:GetChildren()) do
                     local fNum = child.Name:match("^Floor(%d+)$")
                     if fNum then
-                        local fp = child:FindFirstChild("FarmPlot")
+                        local fp = findFarmPlot(child.Name)
                         if fp then
                             table.insert(activePlots, {plot = fp, floorIndex = tonumber(fNum)})
                         end
@@ -421,7 +432,6 @@ MainTab:CreateToggle({
                             local growth = floorData.PlotUnlockGrowth or 1.4
                             local base = bases and (bases[ring] or bases[#bases] or 25) or 25
                             cost = base * (growth ^ totalUnlocked)
-                            warn(cost, currentMoney)
                         end
                         if cost <= 0 then continue end
                         local rawMoney = getMyMoney()
@@ -449,7 +459,7 @@ local AutoPlantBest = false
 MainTab:CreateToggle({
     Name = "Auto Plant Best",
     CurrentValue = false,
-    Flag = "AlphaAutoPlantBest_Floor1",
+    Flag = "AlphaAutoPlantBest",
     Callback = function(Value)
         AutoPlantBest = Value
         if AutoPlantBest then
@@ -458,13 +468,13 @@ MainTab:CreateToggle({
                     if not myPlot then myPlot = findMyPlot() end
                     if myPlot then
                         local activePlots = {}
-                        local fp1 = myPlot:FindFirstChild("FarmPlot")
+                        local fp1 = findFarmPlot("Floor1")
                         if fp1 then
                             table.insert(activePlots, fp1)
                         end
                         for _, child in ipairs(myPlot:GetChildren()) do
                             if child.Name:match("^Floor%d+$") then
-                                local fp = child:FindFirstChild("FarmPlot")
+                                local fp = findFarmPlot(child.Name)
                                 if fp then
                                     table.insert(activePlots, fp)
                                 end
