@@ -351,8 +351,7 @@ MainTab:CreateToggle({
                     local numB = tonumber(b.Name:match("%d+")) or 0
                     return numA < numB
                 end)
-                local farmPlotStage = farmPlot:GetAttribute("FarmPlotStage") or farmPlot:GetAttribute("Stage") or 
-                                      myPlot:GetAttribute("FarmPlotStage_Floor1") or myPlot:GetAttribute("Stage_Floor1") or 1
+                local farmPlotStage = farmPlot:GetAttribute("FarmPlotStage") or farmPlot:GetAttribute("Stage") or myPlot:GetAttribute("FarmPlotStage_Floor1") or myPlot:GetAttribute("Stage_Floor1") or 1
                 for _, child in ipairs(children) do
                     if not AutoUnlockGround or _G.AlphaScriptExecutionId ~= currentExecId then break end
                     local dirt = child:FindFirstChild("Dirt")
@@ -373,8 +372,7 @@ MainTab:CreateToggle({
                     local ring = math.floor((plotKey - 1) / 10) + 1
                     if ring > farmPlotStage then continue end
                     local cost = nil
-                    local rawCost = child:GetAttribute("Cost") or child:GetAttribute("Price") or child:GetAttribute("UnlockCost") or 
-                                    dirt:GetAttribute("Cost") or dirt:GetAttribute("Price") or dirt:GetAttribute("UnlockCost")
+                    local rawCost = child:GetAttribute("Cost") or child:GetAttribute("Price") or child:GetAttribute("UnlockCost") or dirt:GetAttribute("Cost") or dirt:GetAttribute("Price") or dirt:GetAttribute("UnlockCost")
                     if type(rawCost) == "number" then
                         cost = rawCost
                     elseif type(rawCost) == "string" then
@@ -384,8 +382,7 @@ MainTab:CreateToggle({
                         local lock = child:FindFirstChild("Lock")
                         local textLabel = lock and lock:FindFirstChildWhichIsA("TextLabel", true)
                         if textLabel then
-                            local parsed = parseShortenedNumber(textLabel.Text)
-                            if parsed > 0 then cost = parsed end
+                            cost = parseShortenedNumber(textLabel.Text)
                         end
                     end
                     if not cost or cost <= 0 then
@@ -395,19 +392,18 @@ MainTab:CreateToggle({
                             local growth = floorData.PlotUnlockGrowth or 1.4
                             local base = bases and (bases[farmPlotStage] or bases[#bases] or 25) or 25
                             cost = base * (growth ^ (plotKey - 1))
-                        else
-                            cost = 0
                         end
                     end
-                    local currentMoney = getMyMoney()
-                    if cost and cost > 0 and currentMoney >= cost then
+                    if not cost or cost <= 0 then continue end
+                    local rawMoney = getMyMoney()
+                    local currentMoney = type(rawMoney) == "number" and rawMoney or parseShortenedNumber(tostring(rawMoney)) or 0
+                    if currentMoney >= cost then
                         pcall(function()
                             unlockPlotRemote:FireServer(dirt)
                         end)
                         task.wait(0.1)
                     end
                 end
-
                 task.wait(1)
             end
         end)
