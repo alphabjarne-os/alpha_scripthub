@@ -298,7 +298,7 @@ MainTab:CreateToggle({
                             sellCrates:FireServer()
                         end
                     end
-                    task.wait(15)
+                    task.wait(2)
                 end
             end)
         end
