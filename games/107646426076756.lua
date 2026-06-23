@@ -84,6 +84,41 @@ local function getMyMoney()
 end
 
 local Configuration = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Configuration"))
+local RollSeedsEvent = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("RollSeeds")
+local RollAnimationDoneEvent = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("RollAnimationDone")
+local BuySeedEvent = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("BuySeed", 5)
+local RaritiesConfig = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Registry"):WaitForChild("Rarities"))
+local PlantsConfig = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Registry"):WaitForChild("Plants"))
+
+local AutoRollEnabled = false
+local currentRollId = nil
+local isProcessingRoll = false
+local lastSlotsData = nil
+
+local SelectedRarities = {}
+local sortedRarities = {}
+local seenRarities = {}
+
+for name, data in pairs(RaritiesConfig) do
+    if type(data) == "table" and data.Order then
+        seenRarities[name:lower()] = true
+        table.insert(sortedRarities, {Name = name, Order = data.Order})
+    end
+end
+
+for _, plantData in pairs(PlantsConfig) do
+    if type(plantData) == "table" and plantData.Rarity then
+        local rarityName = plantData.Rarity
+        if not seenRarities[rarityName:lower()] then
+            seenRarities[rarityName:lower()] = true
+            table.insert(sortedRarities, {Name = rarityName, Order = 999})
+        end
+    end
+end
+
+table.sort(sortedRarities, function(a, b)
+    return a.Order < b.Order
+end)
 
 local function getSlotCrop(slot)
     for _, child in ipairs(slot:GetChildren()) do
@@ -438,8 +473,21 @@ MainTab:CreateToggle({
                                     local slots = {}
                                     for _, slot in ipairs(children) do
                                         local dirt = slot:FindFirstChild("Dirt")
-                                        local isUnlocked = slot:GetAttribute("Unlocked") == true
-                                        if dirt and isUnlocked then
+                                        local isUnlocked = slot:GetAttribute("Unlocked")
+                                        local isLocked
+                                        if isUnlocked ~= nil then
+                                            isLocked = not isUnlocked
+                                        else
+                                            isLocked = slot:GetAttribute("Locked")
+                                            if isLocked == nil then
+                                                isLocked = slot:GetAttribute("IsLocked")
+                                            end
+                                            if isLocked == nil then
+                                                isLocked = slot:FindFirstChild("Lock") ~= nil or (dirt.Transparency > 0.1)
+                                            end
+                                        end
+                                        local isSlotUnlocked = not isLocked
+                                        if dirt and isSlotUnlocked then
                                             local crop = getSlotCrop(slot)
                                             local cropName = crop and (crop:GetAttribute("Plant") or crop.Name) or nil
                                             local plantData = cropName and PlantsConfig[cropName]
@@ -656,42 +704,6 @@ MainTab:CreateToggle({
 })
 
 MainTab:CreateSection("Auto Roll")
-
-local RollSeedsEvent = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("RollSeeds")
-local RollAnimationDoneEvent = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("RollAnimationDone")
-local BuySeedEvent = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("BuySeed", 5)
-local RaritiesConfig = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Registry"):WaitForChild("Rarities"))
-local PlantsConfig = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Registry"):WaitForChild("Plants"))
-
-local AutoRollEnabled = false
-local currentRollId = nil
-local isProcessingRoll = false
-local lastSlotsData = nil
-
-local SelectedRarities = {}
-local sortedRarities = {}
-local seenRarities = {}
-
-for name, data in pairs(RaritiesConfig) do
-    if type(data) == "table" and data.Order then
-        seenRarities[name:lower()] = true
-        table.insert(sortedRarities, {Name = name, Order = data.Order})
-    end
-end
-
-for _, plantData in pairs(PlantsConfig) do
-    if type(plantData) == "table" and plantData.Rarity then
-        local rarityName = plantData.Rarity
-        if not seenRarities[rarityName:lower()] then
-            seenRarities[rarityName:lower()] = true
-            table.insert(sortedRarities, {Name = rarityName, Order = 999})
-        end
-    end
-end
-
-table.sort(sortedRarities, function(a, b)
-    return a.Order < b.Order
-end)
 
 local function checkAndBuySeeds()
     if not lastSlotsData then return end
