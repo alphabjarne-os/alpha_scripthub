@@ -263,13 +263,10 @@ rollConnection = RollSeedsEvent.OnClientEvent:Connect(function(arg1, arg2)
                     task.wait(0.2)
                 end
             end
-            print("[Alpha Hub] Processing slots: " .. tostring(#slots))
             local currentMoney = getMyMoney()
-            print("[Alpha Hub] Current Money: " .. tostring(currentMoney))
             for slotIndex, slot in ipairs(slots) do
                 local seedName = slot.Seed
                 if seedName then
-                    print("[Alpha Hub] Slot " .. tostring(slotIndex) .. " contains seed: " .. tostring(seedName))
                     local rarity, cost, model = getSeedDetails(seedName)
                     if rarity and cost and model then
                         model.Name = "ProcessedSeed"
@@ -281,18 +278,15 @@ rollConnection = RollSeedsEvent.OnClientEvent:Connect(function(arg1, arg2)
                             shouldBuy = BuyRarities[rarityLower]
                         end
                         
-                        print("[Alpha Hub] Seed: " .. tostring(seedName) .. ", Rarity: " .. tostring(rarityClean) .. ", Cost: " .. tostring(cost) .. ", Configured to buy: " .. tostring(shouldBuy) .. ", Has money: " .. tostring(currentMoney >= cost))
-                        
                         if shouldBuy and currentMoney >= cost then
                             if BuySeedEvent then
                                 pcall(function()
                                     BuySeedEvent:FireServer(slotIndex)
                                 end)
-                                print("[Alpha Hub] Auto-bought " .. tostring(rarityClean) .. " " .. tostring(seedName) .. " via event for slot " .. tostring(slotIndex))
                                 currentMoney = currentMoney - cost
                                 task.wait(0.1)
                             else
-                                print("[Alpha Hub] BuySeed RemoteEvent not found!")
+                                warn("[Alpha Hub] BuySeed RemoteEvent not found!")
                             end
                         end
                     end
