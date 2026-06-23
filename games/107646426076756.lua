@@ -436,7 +436,7 @@ MainTab:CreateToggle({
                 while AutoPlantBest and _G.AlphaScriptExecutionId == currentExecId do
                     if not myPlot then myPlot = findMyPlot() end
                     if myPlot then
-                        local farmPlot = findFarmPlot("Floor1")
+                        local farmPlot = myPlot:FindFirstChild("FarmPlot")
                         if farmPlot then
                             local children = farmPlot:GetChildren()
                             local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
