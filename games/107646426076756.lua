@@ -143,14 +143,18 @@ MainTab:CreateButton({
                 end
                 for _, tool in ipairs(tools) do
                     if tool.Parent then
+                        local qty = tonumber(tool.Name:match("%[x(%d+)%]")) or 1
                         pcall(function()
                             equipTool:FireServer(tool)
                         end)
                         task.wait(0.05)
-                        pcall(function()
-                            discardSeed:FireServer()
-                        end)
-                        task.wait(0.05)
+                        for i = 1, qty do
+                            if not tool.Parent then break end
+                            pcall(function()
+                                discardSeed:FireServer()
+                            end)
+                            task.wait(0.05)
+                        end
                     end
                 end
             end)
