@@ -91,32 +91,17 @@ MainTab:CreateToggle({
     end,
 })
 
+local function getSeedRoller()
+    if not myPlot then myPlot = findMyPlot() end
+    return myPlot and myPlot:FindFirstChild("SeedRoller")
+end
+
 MainTab:CreateSection("Auto Roll")
 
 local RollSeedsEvent = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("RollSeeds")
 local RollAnimationDoneEvent = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("RollAnimationDone")
 
 local AutoRollEnabled = false
-local currentRollId = nil
-
-local rollConnection
-rollConnection = RollSeedsEvent.OnClientEvent:Connect(function(data)
-    if _G.AlphaScriptExecutionId ~= currentExecId then
-        if rollConnection then
-            rollConnection:Disconnect()
-        end
-        return
-    end
-    
-    if data and data.RollId then
-        currentRollId = data.RollId
-        pcall(function()
-            RollAnimationDoneEvent:FireServer(currentRollId)
-        end)
-    else
-        warn("[Alpha Hub] RollSeeds OnClientEvent received invalid data:", tostring(data))
-    end
-end)
 
 MainTab:CreateToggle({
     Name = "Auto Roll",
@@ -127,15 +112,48 @@ MainTab:CreateToggle({
         if AutoRollEnabled then
             task.spawn(function()
                 while AutoRollEnabled and _G.AlphaScriptExecutionId == currentExecId do
-                    currentRollId = nil
+                    local seedRoller = getSeedRoller()
+                    if not seedRoller then
+                        task.wait(1)
+                        continue
+                    end
+                    
+                    local lastRollId = seedRoller:GetAttribute("RollId") or seedRoller:GetAttribute("RollID") or seedRoller:GetAttribute("CurrentRollId") or seedRoller:GetAttribute("RollId")
+                    local lastSeed = seedRoller:GetAttribute("RolledSeed1")
+                    
                     pcall(function()
                         RollSeedsEvent:FireServer()
                     end)
                     
+                    local rollId = nil
+                    local success = false
                     local elapsed = 0
-                    while not currentRollId and elapsed < 3 and AutoRollEnabled and _G.AlphaScriptExecutionId == currentExecId do
+                    
+                    while elapsed < 4 and AutoRollEnabled and _G.AlphaScriptExecutionId == currentExecId do
+                        local currentRollId = seedRoller:GetAttribute("RollId") or seedRoller:GetAttribute("RollID") or seedRoller:GetAttribute("CurrentRollId") or seedRoller:GetAttribute("RollId")
+                        local currentSeed = seedRoller:GetAttribute("RolledSeed1")
+                        
+                        if (currentRollId and currentRollId ~= lastRollId) or (currentSeed and currentSeed ~= "" and currentSeed ~= lastSeed) then
+                            rollId = currentRollId
+                            success = true
+                            break
+                        end
+                        
                         task.wait(0.1)
                         elapsed = elapsed + 0.1
+                    end
+                    
+                    if success then
+                        local attrs = seedRoller:GetAttributes()
+                        for k, v in pairs(attrs) do
+                            print("[Alpha Hub] Attribute: " .. tostring(k) .. " = " .. tostring(v))
+                        end
+                        
+                        if rollId then
+                            pcall(function()
+                                RollAnimationDoneEvent:FireServer(rollId)
+                            end)
+                        end
                     end
                     
                     task.wait(1)
