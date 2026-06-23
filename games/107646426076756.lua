@@ -4,7 +4,8 @@ local player = game.Players.LocalPlayer
 local myPlot = nil
 
 local function findMyPlot()
-    local plots = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Plots")
+    local map = workspace:WaitForChild("Map", 10)
+    local plots = map and map:WaitForChild("Plots", 10)
     if plots and player then
         for _, plot in ipairs(plots:GetChildren()) do
             if plot:GetAttribute("OwnerUserId") == player.UserId then
@@ -14,8 +15,6 @@ local function findMyPlot()
     end
     return nil
 end
-
-myPlot = findMyPlot()
 
 local function parseShortenedNumber(str)
     if not str then return 0 end
@@ -96,21 +95,26 @@ local activeToggles = {}
 
 local function addFloorSection(floorId, displayName)
     task.spawn(function()
-        while not myPlot and _G.AlphaScriptExecutionId == currentExecId do
+        while _G.AlphaScriptExecutionId == currentExecId do
             myPlot = findMyPlot()
+            if myPlot then break end
             task.wait(0.5)
         end
         
         if not myPlot then return end
         
-        local floorObj = myPlot:WaitForChild(floorId, 5)
-        local sign = floorObj and floorObj:WaitForChild("PlotUpgradeSign", 5)
-        local screen = sign and sign:WaitForChild("Screen", 5)
-        local surfaceGui = screen and screen:WaitForChild("SurfaceGui", 5)
+        local floorObj = myPlot:WaitForChild(floorId, 15)
+        if not floorObj then return end
+        
+        local sign = floorObj:WaitForChild("PlotUpgradeSign", 15)
+        local screen = sign and sign:WaitForChild("Screen", 15)
+        local surfaceGui = screen and screen:WaitForChild("SurfaceGui", 15)
         
         if not surfaceGui then return end
         
         MainTab:CreateSection("Auto Upgrade (" .. displayName .. ")")
+        
+        task.wait(0.5)
         
         for _, child in ipairs(surfaceGui:GetChildren()) do
             if child:IsA("GuiObject") then
