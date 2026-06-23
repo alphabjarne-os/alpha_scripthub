@@ -130,6 +130,7 @@ local PlantsConfig = require(game:GetService("ReplicatedStorage"):WaitForChild("
 local AutoRollEnabled = false
 local currentRollId = nil
 local isProcessingRoll = false
+local lastSlotsData = nil
 
 local SelectedRarities = {}
 local sortedRarities = {}
@@ -156,6 +157,62 @@ table.sort(sortedRarities, function(a, b)
     return a.Order < b.Order
 end)
 
+local function checkAndBuySeeds()
+    if not lastSlotsData then return end
+    if not myPlot then myPlot = findMyPlot() end
+    local roller = myPlot and myPlot:FindFirstChild("SeedRoller")
+    if not roller then return end
+    
+    local currentMoney = getMyMoney()
+    for slotIndex, slot in ipairs(lastSlotsData) do
+        local seedName = slot.Seed
+        if seedName then
+            local val = roller:GetAttribute("RolledSeed" .. tostring(slotIndex))
+            if val == seedName then
+                local plantData = PlantsConfig[seedName]
+                if plantData then
+                    local rarity = plantData.Rarity
+                    local cost = plantData.Cost
+                    
+                    local rarityClean = rarity:match("^%s*(.-)%s*$")
+                    local rarityLower = rarityClean:lower()
+                    
+                    local knownRarity = false
+                    for _, rarityInfo in ipairs(sortedRarities) do
+                        if rarityInfo.Name:lower() == rarityLower then
+                            knownRarity = true
+                            break
+                        end
+                    end
+                    
+                    local shouldBuy = false
+                    if knownRarity then
+                        shouldBuy = SelectedRarities[rarityLower] == true
+                    else
+                        shouldBuy = SelectedRarities["other"] == true
+                    end
+                    
+                    if shouldBuy and currentMoney >= cost then
+                        if BuySeedEvent then
+                            pcall(function()
+                                BuySeedEvent:FireServer(slotIndex)
+                            end)
+                            currentMoney = currentMoney - cost
+                            local model = workspace:FindFirstChild(seedName)
+                            if model then
+                                model.Name = "ProcessedSeed"
+                            end
+                            task.wait(0.05)
+                        else
+                            warn("[Alpha Hub] BuySeed RemoteEvent not found!")
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
 local rollConnection
 rollConnection = RollSeedsEvent.OnClientEvent:Connect(function(arg1, arg2)
     if _G.AlphaScriptExecutionId ~= currentExecId then
@@ -178,58 +235,61 @@ rollConnection = RollSeedsEvent.OnClientEvent:Connect(function(arg1, arg2)
     if rollId then
         isProcessingRoll = true
         currentRollId = rollId
+        lastSlotsData = slots
         pcall(function()
             RollAnimationDoneEvent:FireServer(rollId)
         end)
         
-        if slots then
-            task.wait(0.05)
-            local currentMoney = getMyMoney()
-            for slotIndex, slot in ipairs(slots) do
-                local seedName = slot.Seed
-                if seedName then
-                    local plantData = PlantsConfig[seedName]
-                    if plantData then
-                        local rarity = plantData.Rarity
-                        local cost = plantData.Cost
-                        
-                        local rarityClean = rarity:match("^%s*(.-)%s*$")
-                        local rarityLower = rarityClean:lower()
-                        
-                        local knownRarity = false
-                        for _, rarityInfo in ipairs(sortedRarities) do
-                            if rarityInfo.Name:lower() == rarityLower then
-                                knownRarity = true
-                                break
-                            end
-                        end
-                        
-                        local shouldBuy = false
-                        if knownRarity then
-                            shouldBuy = SelectedRarities[rarityLower] == true
-                        else
-                            shouldBuy = SelectedRarities["other"] == true
-                        end
-                        
-                        if shouldBuy and currentMoney >= cost then
-                            if BuySeedEvent then
-                                pcall(function()
-                                    BuySeedEvent:FireServer(slotIndex)
-                                end)
-                                currentMoney = currentMoney - cost
-                                local model = workspace:FindFirstChild(seedName)
-                                if model then
-                                    model.Name = "ProcessedSeed"
+        pcall(function()
+            if slots then
+                task.wait(0.05)
+                local currentMoney = getMyMoney()
+                for slotIndex, slot in ipairs(slots) do
+                    local seedName = slot.Seed
+                    if seedName then
+                        local plantData = PlantsConfig[seedName]
+                        if plantData then
+                            local rarity = plantData.Rarity
+                            local cost = plantData.Cost
+                            
+                            local rarityClean = rarity:match("^%s*(.-)%s*$")
+                            local rarityLower = rarityClean:lower()
+                            
+                            local knownRarity = false
+                            for _, rarityInfo in ipairs(sortedRarities) do
+                                if rarityInfo.Name:lower() == rarityLower then
+                                    knownRarity = true
+                                    break
                                 end
-                                task.wait(0.05)
+                            end
+                            
+                            local shouldBuy = false
+                            if knownRarity then
+                                shouldBuy = SelectedRarities[rarityLower] == true
                             else
-                                warn("[Alpha Hub] BuySeed RemoteEvent not found!")
+                                shouldBuy = SelectedRarities["other"] == true
+                            end
+                            
+                            if shouldBuy and currentMoney >= cost then
+                                if BuySeedEvent then
+                                    pcall(function()
+                                        BuySeedEvent:FireServer(slotIndex)
+                                    end)
+                                    currentMoney = currentMoney - cost
+                                    local model = workspace:FindFirstChild(seedName)
+                                    if model then
+                                        model.Name = "ProcessedSeed"
+                                    end
+                                    task.wait(0.05)
+                                else
+                                    warn("[Alpha Hub] BuySeed RemoteEvent not found!")
+                                end
                             end
                         end
                     end
                 end
             end
-        end
+        end)
         isProcessingRoll = false
     end
 end)
@@ -250,9 +310,17 @@ MainTab:CreateToggle({
                     end)
                     
                     local elapsed = 0
+                    local lastRetry = tick()
                     while (currentRollId == lastRollId or isProcessingRoll) and elapsed < 8 and AutoRollEnabled and _G.AlphaScriptExecutionId == currentExecId do
                         task.wait(0.05)
                         elapsed = elapsed + 0.05
+                        
+                        if not isProcessingRoll and tick() - lastRetry > 0.5 then
+                            pcall(function()
+                                RollSeedsEvent:FireServer()
+                            end)
+                            lastRetry = tick()
+                        end
                     end
                     
                     task.wait(0.1)
@@ -285,6 +353,7 @@ MainTab:CreateDropdown({
         elseif type(Option) == "string" then
             SelectedRarities[Option:lower()] = true
         end
+        task.spawn(checkAndBuySeeds)
     end,
 })
 
