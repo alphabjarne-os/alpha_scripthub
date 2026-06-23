@@ -95,9 +95,50 @@ MainTab:CreateSection("Auto Roll")
 
 local RollSeedsEvent = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("RollSeeds")
 local RollAnimationDoneEvent = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("RollAnimationDone")
+local RaritiesConfig = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Registry"):WaitForChild("Rarities"))
 
 local AutoRollEnabled = false
 local currentRollId = nil
+
+local BuyRarities = {
+    Other = false,
+}
+local sortedRarities = {}
+
+for name, data in pairs(RaritiesConfig) do
+    if type(data) == "table" and data.Order then
+        table.insert(sortedRarities, {Name = name, Order = data.Order})
+    end
+end
+
+table.sort(sortedRarities, function(a, b)
+    return a.Order < b.Order
+end)
+
+local function getSeedDetails(seedName)
+    local start = tick()
+    local model = nil
+    while tick() - start < 1 and AutoRollEnabled and _G.AlphaScriptExecutionId == currentExecId do
+        model = workspace:FindFirstChild(seedName)
+        if model then
+            local union = model:FindFirstChild("Union")
+            local seedGui = union and union:FindFirstChild("SeedGui")
+            local frame = seedGui and seedGui:FindFirstChild("Frame")
+            local infoFrame = frame and frame:FindFirstChild("InfoFrame")
+            
+            if infoFrame then
+                local rarityLabel = infoFrame:FindFirstChild("Rarity")
+                local costLabel = infoFrame:FindFirstChild("Cost")
+                
+                if rarityLabel and costLabel and rarityLabel.Text ~= "" and costLabel.Text ~= "" then
+                    return rarityLabel.Text, parseShortenedNumber(costLabel.Text), model
+                end
+            end
+        end
+        task.wait(0.05)
+    end
+    return nil, nil, nil
+end
 
 local rollConnection
 rollConnection = RollSeedsEvent.OnClientEvent:Connect(function(arg1, arg2)
@@ -111,10 +152,13 @@ rollConnection = RollSeedsEvent.OnClientEvent:Connect(function(arg1, arg2)
     if not AutoRollEnabled then return end
     
     local rollId = nil
+    local slots = nil
     if type(arg1) == "table" then
         rollId = arg1.RollId
+        slots = arg1.Slots
     elseif type(arg1) == "number" then
         rollId = arg1
+        slots = arg2
     end
     
     if rollId then
@@ -122,6 +166,55 @@ rollConnection = RollSeedsEvent.OnClientEvent:Connect(function(arg1, arg2)
         pcall(function()
             RollAnimationDoneEvent:FireServer(rollId)
         end)
+        
+        if slots then
+            local currentMoney = getMyMoney()
+            for slotIndex, slot in ipairs(slots) do
+                local seedName = slot.Seed
+                if seedName then
+                    local rarity, cost, model = getSeedDetails(seedName)
+                    if rarity and cost and model then
+                        model.Name = "ProcessedSeed"
+                        
+                        local rarityClean = rarity:match("^%s*(.-)%s*$")
+                        local knownRarity = false
+                        for k, _ in pairs(BuyRarities) do
+                            if k ~= "Other" and k:lower() == rarityClean:lower() then
+                                knownRarity = true
+                                break
+                            end
+                        end
+                        
+                        local shouldBuy = false
+                        if knownRarity then
+                            shouldBuy = BuyRarities[rarityClean] or BuyRarities[rarityClean:lower()]
+                            if not shouldBuy then
+                                for k, v in pairs(BuyRarities) do
+                                    if v and k:lower() == rarityClean:lower() then
+                                        shouldBuy = true
+                                        break
+                                    end
+                                end
+                            end
+                        else
+                            shouldBuy = BuyRarities.Other
+                        end
+                        
+                        if shouldBuy and currentMoney >= cost then
+                            local prompt = model:FindFirstChild("Union") and model.Union:FindFirstChild("BuySeed")
+                            if prompt and prompt:IsA("ProximityPrompt") then
+                                pcall(function()
+                                    fireproximityprompt(prompt)
+                                end)
+                                print("[Alpha Hub] Auto-bought " .. tostring(rarityClean) .. " " .. tostring(seedName) .. " for $" .. tostring(cost))
+                                currentMoney = currentMoney - cost
+                                task.wait(0.1)
+                            end
+                        end
+                    end
+                end
+            end
+        end
     end
 end)
 
@@ -150,6 +243,33 @@ MainTab:CreateToggle({
                 end
             end)
         end
+    end,
+})
+
+MainTab:CreateSection("Auto Buy Rarities")
+
+for _, rarityInfo in ipairs(sortedRarities) do
+    local rarityName = rarityInfo.Name
+    BuyRarities[rarityName] = false
+    BuyRarities[rarityName:lower()] = false
+    
+    MainTab:CreateToggle({
+        Name = "Buy " .. rarityName,
+        CurrentValue = false,
+        Flag = "AlphaBuy" .. rarityName,
+        Callback = function(Value)
+            BuyRarities[rarityName] = Value
+            BuyRarities[rarityName:lower()] = Value
+        end,
+    })
+end
+
+MainTab:CreateToggle({
+    Name = "Buy Other",
+    CurrentValue = false,
+    Flag = "AlphaBuyOther",
+    Callback = function(Value)
+        BuyRarities.Other = Value
     end,
 })
 
