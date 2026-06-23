@@ -651,15 +651,18 @@ local function addFloorSection(floorId, displayName)
                                                 end
                                                 
                                                 if isLocked then
-                                                    local plotKey = child:GetAttribute("PlotKey") or tonumber(child.Name:match("%d+")) or 1
-                                                    local ring = math.floor((plotKey - 1) / 10) + 1
-                                                    
-                                                    local stageAttr = "FarmPlotStage"
-                                                    if floorId ~= "Floor1" then
-                                                        stageAttr = "FarmPlotStage_" .. floorId
+                                                    local plotKey = child:GetAttribute("PlotKey") or tonumber(child.Name:match("%d+"))
+                                                    local ring = 1
+                                                    if plotKey then
+                                                        ring = math.floor((plotKey - 1) / 10) + 1
+                                                    else
+                                                        warn("[Alpha Hub] Missing PlotKey attribute and number in name for child: " .. child.Name)
                                                     end
                                                     
-                                                    local farmPlotStage = farmPlot:GetAttribute(stageAttr) or farmPlot:GetAttribute("FarmPlotStage") or myPlot:GetAttribute(stageAttr) or myPlot:GetAttribute("FarmPlotStage") or 1
+                                                    local stageAttr = "FarmPlotStage_" .. floorId
+                                                    local farmPlotStage = farmPlot:GetAttribute(stageAttr) or myPlot:GetAttribute(stageAttr) or 1
+                                                    
+                                                    print(string.format("[Alpha Hub] Ground check - Name: %s, PlotKey: %s, Calculated Ring: %d, FarmPlotStage: %d", child.Name, tostring(plotKey), ring, farmPlotStage))
                                                     
                                                     if ring <= farmPlotStage then
                                                         local cost = child:GetAttribute("Cost") or child:GetAttribute("Price") or child:GetAttribute("UnlockCost")
