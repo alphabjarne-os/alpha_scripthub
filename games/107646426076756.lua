@@ -86,6 +86,7 @@ end
 local Configuration = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Configuration"))
 
 local MainTab = Window:CreateTab("Main", 4483362458)
+local FloorGeneralTab = Window:CreateTab("Floor General", 4483362458)
 MainTab:CreateSection("Automation")
 
 MainTab:CreateToggle({
@@ -711,10 +712,10 @@ local function addFloorSection(floorId, displayName)
         if not surfaceGui then return end
         
         local FloorTab = Window:CreateTab(displayName, 4483362458)
-        FloorTab:CreateSection("Automation")
+        FloorGeneralTab:CreateSection(displayName)
         
         local AutoUnlockGround = false
-        FloorTab:CreateToggle({
+        FloorGeneralTab:CreateToggle({
             Name = "Auto Buy Ground",
             CurrentValue = false,
             Flag = "AlphaAutoBuyGround_" .. floorId,
@@ -759,8 +760,26 @@ local function addFloorSection(floorId, displayName)
                                                     local stageAttr = "FarmPlotStage_" .. floorId
                                                     local farmPlotStage = farmPlot:GetAttribute("FarmPlotStage") or farmPlot:GetAttribute("Stage") or myPlot:GetAttribute(stageAttr) or myPlot:GetAttribute("Stage_" .. floorId) or farmPlot:GetAttribute(stageAttr) or 1
                                                     if ring <= farmPlotStage then
-                                                        local cost = child:GetAttribute("Cost") or child:GetAttribute("Price") or child:GetAttribute("UnlockCost")
-                                                        if not cost then
+                                                        local cost = nil
+                                                        local rawCost = child:GetAttribute("Cost") or child:GetAttribute("Price") or child:GetAttribute("UnlockCost") or dirt:GetAttribute("Cost") or dirt:GetAttribute("Price") or dirt:GetAttribute("UnlockCost")
+                                                        if type(rawCost) == "number" then
+                                                            cost = rawCost
+                                                        elseif type(rawCost) == "string" then
+                                                            cost = parseShortenedNumber(rawCost)
+                                                        end
+                                                        if not cost or cost <= 0 then
+                                                            local lock = child:FindFirstChild("Lock")
+                                                            if lock then
+                                                                local textLabel = lock:FindFirstChildWhichIsA("TextLabel", true)
+                                                                if textLabel then
+                                                                    local parsed = parseShortenedNumber(textLabel.Text)
+                                                                    if parsed > 0 then
+                                                                        cost = parsed
+                                                                    end
+                                                                end
+                                                            end
+                                                        end
+                                                        if not cost or cost <= 0 then
                                                             local floorIndex = tonumber(floorId:match("%d+")) or 1
                                                             local floorData = Configuration and Configuration.FloorConfig and Configuration.FloorConfig[floorIndex]
                                                             if floorData then
@@ -796,7 +815,7 @@ local function addFloorSection(floorId, displayName)
         })
         
         local AutoPlantBest = false
-        FloorTab:CreateToggle({
+        FloorGeneralTab:CreateToggle({
             Name = "Auto Plant Best",
             CurrentValue = false,
             Flag = "AlphaAutoPlantBest_" .. floorId,
