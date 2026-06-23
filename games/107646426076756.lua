@@ -122,6 +122,43 @@ MainTab:CreateToggle({
     end,
 })
 
+MainTab:CreateButton({
+    Name = "Delete Seed Inventory",
+    Callback = function()
+        local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+        local equipTool = remotes and remotes:FindFirstChild("EquipTool")
+        local discardSeed = remotes and remotes:FindFirstChild("DiscardSeed")
+        if equipTool and discardSeed then
+            task.spawn(function()
+                local tools = {}
+                for _, tool in ipairs(player.Backpack:GetChildren()) do
+                    if tool:IsA("Tool") and tool:GetAttribute("InventoryCategory") == "Seeds" then
+                        table.insert(tools, tool)
+                    end
+                end
+                for _, tool in ipairs(player.Character:GetChildren()) do
+                    if tool:IsA("Tool") and tool:GetAttribute("InventoryCategory") == "Seeds" then
+                        table.insert(tools, tool)
+                    end
+                end
+                for _, tool in ipairs(tools) do
+                    if tool.Parent then
+                        pcall(function()
+                            equipTool:FireServer(tool)
+                        end)
+                        task.wait(0.05)
+                        pcall(function()
+                            discardSeed:FireServer()
+                        end)
+                        task.wait(0.05)
+                    end
+                end
+            end)
+        end
+    end,
+})
+
+
 MainTab:CreateSection("Auto Upgrades")
 
 local AutoUpgradeSeedRolls = false
