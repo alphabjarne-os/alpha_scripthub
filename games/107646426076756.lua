@@ -662,12 +662,13 @@ local function getMainUpgradeInfo(upgradeName)
                 if upgradeName == "UpgradeSeedLuck" then
                     local desc = frame:FindFirstChild("Desc")
                     if desc then
-                        level = tonumber(desc.Text:match("^(%d+)")) or 1
+                        level = tonumber(desc.Text:match("(%d+)")) or 1
                     end
                 elseif upgradeName == "UpgradeSeedRolls" then
                     level = myPlot:GetAttribute("SeedStands") or 1
                 elseif upgradeName == "UpgradeFarm" then
-                    level = myPlot:GetAttribute("FarmPlotStage") or 1
+                    local farmPlot = myPlot:FindFirstChild("FarmPlot")
+                    level = farmPlot and farmPlot:GetAttribute("FarmPlotStage") or 1
                 end
             end
         end
@@ -691,13 +692,17 @@ task.spawn(function()
                     if price > 0 and currentMoney >= price then
                         local remote = remotes and remotes:FindFirstChild("UpgradeSeedRolls")
                         if remote then
-                            local success = pcall(function()
-                                remote:InvokeServer()
+                            local success, err = pcall(function()
+                                return remote:InvokeServer()
                             end)
                             if success then
                                 currentMoney = currentMoney - price
                                 task.wait(0.1)
+                            else
+                                warn("[Alpha Hub] Failed to upgrade Seed Rolls: " .. tostring(err))
                             end
+                        else
+                            warn("[Alpha Hub] UpgradeSeedRolls remote function not found!")
                         end
                     end
                 end
@@ -710,13 +715,17 @@ task.spawn(function()
                     if price > 0 and currentMoney >= price then
                         local remote = remotes and remotes:FindFirstChild("UpgradeSeedLuck")
                         if remote then
-                            local success = pcall(function()
-                                remote:InvokeServer()
+                            local success, err = pcall(function()
+                                return remote:InvokeServer()
                             end)
                             if success then
                                 currentMoney = currentMoney - price
                                 task.wait(0.1)
+                            else
+                                warn("[Alpha Hub] Failed to upgrade Seed Luck: " .. tostring(err))
                             end
+                        else
+                            warn("[Alpha Hub] UpgradeSeedLuck remote function not found!")
                         end
                     end
                 end
@@ -729,13 +738,17 @@ task.spawn(function()
                     if price > 0 and currentMoney >= price then
                         local remote = remotes and remotes:FindFirstChild("UpgradeFarm")
                         if remote then
-                            local success = pcall(function()
-                                remote:InvokeServer()
+                            local success, err = pcall(function()
+                                return remote:InvokeServer()
                             end)
                             if success then
                                 currentMoney = currentMoney - price
                                 task.wait(0.1)
+                            else
+                                warn("[Alpha Hub] Failed to upgrade Farm: " .. tostring(err))
                             end
+                        else
+                            warn("[Alpha Hub] UpgradeFarm remote function not found!")
                         end
                     end
                 end
