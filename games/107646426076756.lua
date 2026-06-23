@@ -86,7 +86,6 @@ end
 local Configuration = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Configuration"))
 
 local MainTab = Window:CreateTab("Main", 4483362458)
-local FloorGeneralTab = Window:CreateTab("Floor General", 4483362458)
 MainTab:CreateSection("Automation")
 
 MainTab:CreateToggle({
@@ -712,10 +711,10 @@ local function addFloorSection(floorId, displayName)
         if not surfaceGui then return end
         
         local FloorTab = Window:CreateTab(displayName, 4483362458)
-        FloorGeneralTab:CreateSection(displayName)
+        MainTab:CreateSection(displayName .. " Automation")
         
         local AutoUnlockGround = false
-        FloorGeneralTab:CreateToggle({
+        MainTab:CreateToggle({
             Name = "Auto Buy Ground",
             CurrentValue = false,
             Flag = "AlphaAutoBuyGround_" .. floorId,
@@ -815,7 +814,7 @@ local function addFloorSection(floorId, displayName)
         })
         
         local AutoPlantBest = false
-        FloorGeneralTab:CreateToggle({
+        MainTab:CreateToggle({
             Name = "Auto Plant Best",
             CurrentValue = false,
             Flag = "AlphaAutoPlantBest_" .. floorId,
