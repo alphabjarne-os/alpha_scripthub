@@ -116,8 +116,8 @@ local AutoSell = MainTab:CreateToggle({
     end,
 })
 
-local function createFloorTabs(floorId, displayName)
-    local Tab = Window:CreateTab("Auto Upgrade (" .. displayName .. ")", 4483362458)
+local function addFloorSection(floorId, displayName)
+    MainTab:CreateSection("Auto Upgrade (" .. displayName .. ")")
     
     local toggles = {
         ExtraYield = false,
@@ -126,8 +126,10 @@ local function createFloorTabs(floorId, displayName)
         ExtraSprinklerRange = false
     }
     
-    for upgradeName, _ in pairs(toggles) do
-        Tab:CreateToggle({
+    local upgradeOrder = {"ExtraYield", "ExtraSawRange", "ExtraPower", "ExtraSprinklerRange"}
+    
+    for _, upgradeName in ipairs(upgradeOrder) do
+        MainTab:CreateToggle({
             Name = "Auto " .. upgradeName .. " Upgrade",
             CurrentValue = false,
             Flag = floorId .. upgradeName .. "Toggle",
@@ -157,7 +159,7 @@ local function createFloorTabs(floorId, displayName)
     end
 end
 
-createFloorTabs("Floor1", "Floor 1")
-createFloorTabs("Floor2", "Floor 2")
-createFloorTabs("Floor3", "Floor 3")
-createFloorTabs("Floor4", "Floor 4")
+addFloorSection("Floor1", "Floor 1")
+addFloorSection("Floor2", "Floor 2")
+addFloorSection("Floor3", "Floor 3")
+addFloorSection("Floor4", "Floor 4")
