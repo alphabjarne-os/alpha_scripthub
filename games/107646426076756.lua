@@ -191,9 +191,23 @@ local function findFarmPlot(floorId)
     return nil
 end
 
+local function findFloorUpgradeSign(floorId)
+    if not myPlot then myPlot = findMyPlot() end
+    if not myPlot then return nil end
+    if floorId == "Floor1" then
+        return myPlot:FindFirstChild("PlotUpgradeSign")
+    else
+        local container = myPlot:FindFirstChild(floorId)
+        if container then
+            return container:FindFirstChild("PlotUpgradeSign")
+        end
+    end
+    return nil
+end
+
 local function getUpgradePrice(floorId, remoteUpgradeName, uiFrameName, currentLevel)
     if myPlot then
-        local sign = myPlot:FindFirstChild("PlotUpgradeSign")
+        local sign = findFloorUpgradeSign(floorId)
         local screen = sign and sign:FindFirstChild("Screen")
         local surfaceGui = screen and screen:FindFirstChild("SurfaceGui")
         if surfaceGui then
@@ -225,6 +239,11 @@ local function getUpgradePrice(floorId, remoteUpgradeName, uiFrameName, currentL
         elseif remoteUpgradeName:find("SprinklerRange") then
             local costs = floorData.ExtraSprinklerRangeCosts
             return costs and costs[currentLevel + 1] or 0
+        elseif remoteUpgradeName:find("SoilQuality") then
+            local soilData = floorData.SoilQuality
+            if soilData then
+                return math.floor(soilData.BaseCost * (soilData.CostGrowth ^ (currentLevel or 0)))
+            end
         end
         
         return math.floor(base * (growth ^ (currentLevel or 0)))
@@ -970,102 +989,143 @@ MainTab:CreateDropdown({
 })
 
 
-task.spawn(function()
-    while _G.AlphaScriptExecutionId == currentExecId do
-        myPlot = findMyPlot()
-        if myPlot then break end
-        task.wait(0.5)
-    end
-    if _G.AlphaScriptExecutionId ~= currentExecId or not myPlot then return end
-    
-    local sign = myPlot:WaitForChild("PlotUpgradeSign", 10)
-    local screen = sign and sign:WaitForChild("Screen", 10)
-    local surfaceGui = screen and screen:WaitForChild("SurfaceGui", 10)
-    if not surfaceGui then return end
-    
-    local FloorTab = Window:CreateTab("Floor 1", 4483362458)
-    FloorTab:CreateSection("Auto Upgrades")
-    
-    for _, child in ipairs(surfaceGui:GetChildren()) do
-        if child:IsA("GuiObject") then
-            local btn = child:FindFirstChild("Btn")
-            local txt = btn and btn:FindFirstChild("Txt")
-            if txt then
-                local uiFrameName = child.Name
-                local remoteUpgradeName = uiFrameName
-                if remoteUpgradeName:find("Yield") then
-                    remoteUpgradeName = "ExtraYield"
-                elseif remoteUpgradeName:find("Power") then
-                    remoteUpgradeName = "ExtraPower"
-                elseif not remoteUpgradeName:find("^Extra") then
-                    remoteUpgradeName = "Extra" .. remoteUpgradeName
+local function setupFloorTab(floorIndex)
+    task.spawn(function()
+        while _G.AlphaScriptExecutionId == currentExecId do
+            myPlot = findMyPlot()
+            if myPlot then break end
+            task.wait(0.5)
+        end
+        if _G.AlphaScriptExecutionId ~= currentExecId or not myPlot then return end
+        
+        local floorId = "Floor" .. floorIndex
+        local sign = nil
+        
+        if floorIndex == 1 then
+            sign = myPlot:WaitForChild("PlotUpgradeSign", 10)
+        else
+            -- For Floors 2-4, wait until the Floor folder/model container is added to myPlot
+            while _G.AlphaScriptExecutionId == currentExecId do
+                if myPlot then
+                    local floorFolder = myPlot:FindFirstChild(floorId)
+                    if floorFolder then
+                        sign = floorFolder:FindFirstChild("PlotUpgradeSign")
+                        if sign then
+                            break
+                        end
+                    end
                 end
-                
-                local titleObj = child:FindFirstChild("Title")
-                local cleanDisplayName = ""
-                if titleObj and titleObj:IsA("TextLabel") and titleObj.Text ~= "" then
-                    cleanDisplayName = "Auto Upgrade " .. titleObj.Text
-                else
-                    local baseName = remoteUpgradeName:gsub("^Extra", "")
-                    baseName = baseName:gsub("(%u)", " %1"):gsub("^%s+", "")
-                    cleanDisplayName = "Auto Upgrade " .. baseName
-                end
-                
-                local toggleKey = "Floor1_" .. remoteUpgradeName
-                local autoUpgradeActive = false
-                FloorTab:CreateToggle({
-                    Name = cleanDisplayName,
-                    CurrentValue = false,
-                    Flag = "Flag_" .. toggleKey,
-                    Callback = function(Value)
-                        autoUpgradeActive = Value
-                        if autoUpgradeActive then
-                            task.spawn(function()
-                                while autoUpgradeActive and _G.AlphaScriptExecutionId == currentExecId do
-                                    if not myPlot then myPlot = findMyPlot() end
-                                    if myPlot then
-                                        local currentMoney = getMyMoney()
-                                        local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
-                                        local remote = remotes and remotes:FindFirstChild("PlotUpgradeTransaction")
-                                        if remote then
-                                            local currentLevel = 0
-                                            local searchPattern = ""
-                                            if remoteUpgradeName:find("Yield") then
-                                                searchPattern = "Yield"
-                                            elseif remoteUpgradeName:find("Power") then
-                                                searchPattern = "Power"
-                                            elseif remoteUpgradeName:find("SawRange") or remoteUpgradeName:find("Range") then
-                                                searchPattern = "SawRange"
-                                            elseif remoteUpgradeName:find("SprinklerRange") then
-                                                searchPattern = "SprinklerRange"
-                                            end
-                                            if searchPattern ~= "" then
-                                                for attrName, val in pairs(myPlot:GetAttributes()) do
-                                                    if attrName:lower():find(searchPattern:lower()) and attrName:lower():find("floor1") then
-                                                        currentLevel = val
-                                                        break
+                task.wait(1)
+            end
+        end
+        
+        if _G.AlphaScriptExecutionId ~= currentExecId or not sign then return end
+        local screen = sign:WaitForChild("Screen", 10)
+        local surfaceGui = screen and screen:WaitForChild("SurfaceGui", 10)
+        if not surfaceGui then return end
+        
+        local FloorTab = Window:CreateTab("Floor " .. floorIndex, 4483362458)
+        FloorTab:CreateSection("Auto Upgrades")
+        
+        for _, child in ipairs(surfaceGui:GetChildren()) do
+            if child:IsA("GuiObject") then
+                local btn = child:FindFirstChild("Btn")
+                local txt = btn and btn:FindFirstChild("Txt")
+                if txt then
+                    local uiFrameName = child.Name
+                    local remoteUpgradeName = uiFrameName
+                    if remoteUpgradeName:find("Yield") then
+                        remoteUpgradeName = "ExtraYield"
+                    elseif remoteUpgradeName:find("Power") then
+                        remoteUpgradeName = "ExtraPower"
+                    elseif not remoteUpgradeName:find("^Extra") then
+                        remoteUpgradeName = "Extra" .. remoteUpgradeName
+                    end
+                    
+                    local titleObj = child:FindFirstChild("Title")
+                    local cleanDisplayName = ""
+                    if titleObj and titleObj:IsA("TextLabel") and titleObj.Text ~= "" then
+                        cleanDisplayName = "Auto Upgrade " .. titleObj.Text
+                    else
+                        local baseName = remoteUpgradeName:gsub("^Extra", "")
+                        baseName = baseName:gsub("(%u)", " %1"):gsub("^%s+", "")
+                        cleanDisplayName = "Auto Upgrade " .. baseName
+                    end
+                    
+                    local toggleKey = floorId .. "_" .. remoteUpgradeName
+                    local autoUpgradeActive = false
+                    FloorTab:CreateToggle({
+                        Name = cleanDisplayName,
+                        CurrentValue = false,
+                        Flag = "Flag_" .. toggleKey,
+                        Callback = function(Value)
+                            autoUpgradeActive = Value
+                            if autoUpgradeActive then
+                                task.spawn(function()
+                                    while autoUpgradeActive and _G.AlphaScriptExecutionId == currentExecId do
+                                        if not myPlot then myPlot = findMyPlot() end
+                                        if myPlot then
+                                            local currentMoney = getMyMoney()
+                                            local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+                                            local remote = remotes and remotes:FindFirstChild("PlotUpgradeTransaction")
+                                            if remote then
+                                                local currentLevel = 0
+                                                local searchPattern = ""
+                                                if remoteUpgradeName:find("Yield") then
+                                                    searchPattern = "Yield"
+                                                elseif remoteUpgradeName:find("Power") then
+                                                    searchPattern = "Power"
+                                                elseif remoteUpgradeName:find("SawRange") or remoteUpgradeName:find("Range") then
+                                                    searchPattern = "SawRange"
+                                                elseif remoteUpgradeName:find("SprinklerRange") then
+                                                    searchPattern = "SprinklerRange"
+                                                elseif remoteUpgradeName:find("SoilQuality") then
+                                                    searchPattern = "SoilQuality"
+                                                end
+                                                if searchPattern ~= "" then
+                                                    local targetSuffix = "floor" .. floorIndex
+                                                    for attrName, val in pairs(myPlot:GetAttributes()) do
+                                                        local attrLower = attrName:lower()
+                                                        if attrLower:find(searchPattern:lower()) then
+                                                            if floorIndex == 1 then
+                                                                -- Floor 1 can be "floor1" or just have no floor suffix at all
+                                                                if attrLower:find("floor1") or (not attrLower:find("floor2") and not attrLower:find("floor3") and not attrLower:find("floor4")) then
+                                                                    currentLevel = val
+                                                                    break
+                                                                end
+                                                            else
+                                                                if attrLower:find(targetSuffix) then
+                                                                    currentLevel = val
+                                                                    break
+                                                                end
+                                                            end
+                                                        end
+                                                    end
+                                                end
+                                                local price = getUpgradePrice(floorId, remoteUpgradeName, uiFrameName, currentLevel)
+                                                if price > 0 and currentMoney >= price then
+                                                    local success, err = pcall(function()
+                                                        remote:InvokeServer(remoteUpgradeName, floorId)
+                                                    end)
+                                                    if success then
+                                                        currentMoney = currentMoney - price
+                                                        task.wait(0.1)
                                                     end
                                                 end
                                             end
-                                            local price = getUpgradePrice("Floor1", remoteUpgradeName, uiFrameName, currentLevel)
-                                            if price > 0 and currentMoney >= price then
-                                                local success, err = pcall(function()
-                                                    remote:InvokeServer(remoteUpgradeName, "Floor1")
-                                                end)
-                                                if success then
-                                                    currentMoney = currentMoney - price
-                                                    task.wait(0.1)
-                                                end
-                                            end
                                         end
+                                        task.wait(0.5)
                                     end
-                                    task.wait(0.5)
-                                end
-                            end)
-                        end
-                    end,
-                })
+                                end)
+                            end
+                        end,
+                    })
+                end
             end
         end
-    end
-end)
+    end)
+end
+
+for i = 1, 4 do
+    setupFloorTab(i)
+end
