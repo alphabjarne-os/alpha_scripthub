@@ -115,7 +115,7 @@ MainTab:CreateToggle({
                             sellCrates:FireServer()
                         end
                     end
-                    task.wait(1)
+                    task.wait(15)
                 end
             end)
         end
@@ -789,7 +789,21 @@ local function addFloorSection(floorId, displayName)
                                             if dirt and isUnlocked then
                                                 local crop = getSlotCrop(slot)
                                                 if crop then
-                                                    if isCropGrown(crop) then
+                                                    local cropName = crop:GetAttribute("Plant") or crop.Name
+                                                    local currentPlantData = PlantsConfig[cropName]
+                                                    local currentCost = currentPlantData and currentPlantData.Cost or 0
+                                                    
+                                                    local shouldReplace = false
+                                                    if bestTool then
+                                                        local bestPlantName = bestTool:GetAttribute("Plant")
+                                                        local bestPlantData = PlantsConfig[bestPlantName]
+                                                        local bestCost = bestPlantData and bestPlantData.Cost or 0
+                                                        if bestCost > currentCost then
+                                                            shouldReplace = true
+                                                        end
+                                                    end
+                                                    
+                                                    if isCropGrown(crop) or shouldReplace then
                                                         pcall(function()
                                                             removePlant:FireServer(dirt)
                                                         end)
