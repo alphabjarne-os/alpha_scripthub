@@ -33,7 +33,8 @@ local function parseShortenedNumber(str)
     local multipliers = {
         K = 1e3, M = 1e6, B = 1e9, T = 1e12,
         Q = 1e15, Qa = 1e15, Qi = 1e18, Sx = 1e21,
-        Sp = 1e24, Oc = 1e27, No = 1e30
+        Sp = 1e24, Oc = 1e27, 
+        No = 1e30
     }
     
     local mult = multipliers[suffix] or 1
