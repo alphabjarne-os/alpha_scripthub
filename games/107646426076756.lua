@@ -130,32 +130,48 @@ MainTab:CreateButton({
         local discardSeed = remotes and remotes:FindFirstChild("DiscardSeed")
         if equipTool and discardSeed then
             task.spawn(function()
-                local tools = {}
-                for _, tool in ipairs(player.Backpack:GetChildren()) do
-                    if tool:IsA("Tool") and tool:GetAttribute("InventoryCategory") == "Seeds" then
-                        table.insert(tools, tool)
-                    end
-                end
-                for _, tool in ipairs(player.Character:GetChildren()) do
-                    if tool:IsA("Tool") and tool:GetAttribute("InventoryCategory") == "Seeds" then
-                        table.insert(tools, tool)
-                    end
-                end
-                for _, tool in ipairs(tools) do
-                    if tool.Parent then
-                        local qty = tonumber(tool.Name:match("%[x(%d+)%]")) or 1
-                        pcall(function()
-                            equipTool:FireServer(tool)
-                        end)
-                        task.wait(0.05)
-                        for i = 1, qty do
-                            if not tool.Parent then break end
-                            pcall(function()
-                                discardSeed:FireServer()
-                            end)
-                            task.wait(0.05)
+                local lastTool = nil
+                local attempts = 0
+                while true do
+                    local foundTool = nil
+                    for _, tool in ipairs(player.Backpack:GetChildren()) do
+                        if tool:IsA("Tool") and tool:GetAttribute("InventoryCategory") == "Seeds" then
+                            foundTool = tool
+                            break
                         end
                     end
+                    if not foundTool then
+                        for _, tool in ipairs(player.Character:GetChildren()) do
+                            if tool:IsA("Tool") and tool:GetAttribute("InventoryCategory") == "Seeds" then
+                                foundTool = tool
+                                break
+                            end
+                        end
+                    end
+                    if not foundTool then
+                        break
+                    end
+                    if foundTool == lastTool then
+                        attempts = attempts + 1
+                        if attempts > 5 then
+                            task.wait(0.1)
+                            if attempts > 10 then
+                                warn("[Alpha Hub] Failed to discard tool: " .. tostring(foundTool.Name))
+                                break
+                            end
+                        end
+                    else
+                        lastTool = foundTool
+                        attempts = 1
+                    end
+                    pcall(function()
+                        equipTool:FireServer(foundTool)
+                    end)
+                    task.wait(0.05)
+                    pcall(function()
+                        discardSeed:FireServer()
+                    end)
+                    task.wait(0.05)
                 end
             end)
         end
