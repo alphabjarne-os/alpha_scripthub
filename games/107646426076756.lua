@@ -360,12 +360,6 @@ MainTab:CreateToggle({
                     local isLocked
                     if isUnlocked ~= nil then
                         isLocked = not isUnlocked
-                    else
-                        isLocked = child:GetAttribute("Locked")
-                        if isLocked == nil then isLocked = child:GetAttribute("IsLocked") end
-                        if isLocked == nil then 
-                            isLocked = child:FindFirstChild("Lock") ~= nil or (dirt.Transparency > 0.1) 
-                        end
                     end
                     if not isLocked then continue end
                     local plotKey = child:GetAttribute("PlotKey") or tonumber(child.Name:match("%d+")) or 1
@@ -378,6 +372,7 @@ MainTab:CreateToggle({
                             local bases = floorData.PlotUnlockBase
                             local growth = floorData.PlotUnlockGrowth or 1.4
                             local base = bases and (bases[farmPlotStage] or bases[#bases] or 25) or 25
+                            warn(floorData)
                             cost = base * (growth ^ (plotKey - 1))
                         end
                     end
