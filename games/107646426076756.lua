@@ -396,8 +396,8 @@ MainTab:CreateToggle({
                     end
                     if not cost or cost <= 0 then continue end
                     local rawMoney = getMyMoney()
-                    local currentMoney = type(rawMoney) == "number" and rawMoney or parseShortenedNumber(tostring(rawMoney)) or 0
-                    if currentMoney >= cost then
+                    warn(rawMoney,cost)
+                    if rawMoney >= cost then
                         pcall(function()
                             unlockPlotRemote:FireServer(dirt)
                         end)
