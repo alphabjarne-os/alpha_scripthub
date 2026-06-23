@@ -124,7 +124,7 @@ local function addFloorSection(floorId, displayName)
                 local toggleKey = floorId .. "_" .. remoteUpgradeName
                 activeToggles[toggleKey] = false
                 
-                MainTab:CreateToggle(
+                MainTab:CreateToggle({
                     Name = "Auto " .. remoteUpgradeName .. " Upgrade",
                     CurrentValue = false,
                     Flag = "Flag_" .. toggleKey,
@@ -159,7 +159,7 @@ local function addFloorSection(floorId, displayName)
                             end)
                         end
                     end
-                end)
+                })
             end
         end
     end)
