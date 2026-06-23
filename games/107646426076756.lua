@@ -21,12 +21,13 @@ local function parseShortenedNumber(str)
     
     local clean = str:gsub("[$,]", "")
     local suffix = clean:match("%a+$")
-    local numStr = clean:gsub("%a+$", "")
-    local num = tonumber(numStr) or 0
     
     if not suffix then
-        return num
+        return tonumber(clean) or 0
     end
+    
+    local numStr = clean:gsub("%a+$", "")
+    local num = tonumber(numStr) or 0
     
     local multipliers = {
         K = 1e3,
@@ -80,8 +81,43 @@ local function getMyMoney()
     return attrMoney or 0
 end
 
-local function createFloorTabs(floorName)
-    local Tab = Window:CreateTab(floorName, 4483362458)
+local MainTab = Window:CreateTab("Main", 4483362458)
+MainTab:CreateSection("Automation")
+
+local AutoSellEnabled = false
+
+local AutoSell = MainTab:CreateToggle({
+    Name = "AutoSell",
+    CurrentValue = false,
+    Flag = "AutoSellToggle",
+    Callback = function(Value)
+        AutoSellEnabled = Value
+        
+        if AutoSellEnabled then
+            task.spawn(function()
+                while AutoSellEnabled do
+                    if not myPlot then
+                        myPlot = findMyPlot()
+                    end
+                    
+                    if myPlot then
+                        local sellCrates = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes") 
+                            and game:GetService("ReplicatedStorage").Remotes:FindFirstChild("SellCrates")
+                            
+                        if sellCrates then
+                            sellCrates:FireServer()
+                        end
+                    end
+                    
+                    task.wait(1)
+                end
+            end)
+        end
+    end,
+})
+
+local function createFloorTabs(floorId, displayName)
+    local Tab = Window:CreateTab("Auto Upgrade (" .. displayName .. ")", 4483362458)
     
     local toggles = {
         ExtraYield = false,
@@ -92,9 +128,9 @@ local function createFloorTabs(floorName)
     
     for upgradeName, _ in pairs(toggles) do
         Tab:CreateToggle({
-            Name = "Auto " .. upgradeName,
+            Name = "Auto " .. upgradeName .. " Upgrade",
             CurrentValue = false,
-            Flag = floorName .. upgradeName .. "Toggle",
+            Flag = floorId .. upgradeName .. "Toggle",
             Callback = function(Value)
                 toggles[upgradeName] = Value
                 if Value then
@@ -102,13 +138,13 @@ local function createFloorTabs(floorName)
                         while toggles[upgradeName] do
                             if not myPlot then myPlot = findMyPlot() end
                             if myPlot then
-                                local price = getPrice(floorName, upgradeName)
+                                local price = getPrice(floorId, upgradeName)
                                 local currentMoney = getMyMoney()
                                 if currentMoney >= price then
                                     local remote = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes") 
                                         and game:GetService("ReplicatedStorage").Remotes:FindFirstChild("PlotUpgradeTransaction")
                                     if remote then
-                                        remote:InvokeServer(upgradeName, floorName)
+                                        remote:InvokeServer(upgradeName, floorId)
                                     end
                                 end
                             end
@@ -121,7 +157,7 @@ local function createFloorTabs(floorName)
     end
 end
 
-createFloorTabs("Floor1")
-createFloorTabs("Floor2")
-createFloorTabs("Floor3")
-createFloorTabs("Floor4")
+createFloorTabs("Floor1", "Floor 1")
+createFloorTabs("Floor2", "Floor 2")
+createFloorTabs("Floor3", "Floor 3")
+createFloorTabs("Floor4", "Floor 4")
