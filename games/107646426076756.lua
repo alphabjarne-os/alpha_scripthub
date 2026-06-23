@@ -97,6 +97,7 @@ local RollSeedsEvent = game:GetService("ReplicatedStorage"):WaitForChild("Remote
 local RollAnimationDoneEvent = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("RollAnimationDone")
 
 local AutoRollEnabled = false
+local currentRollId = nil
 
 local rollConnection
 rollConnection = RollSeedsEvent.OnClientEvent:Connect(function(data)
@@ -107,19 +108,13 @@ rollConnection = RollSeedsEvent.OnClientEvent:Connect(function(data)
         return
     end
     
-    if not AutoRollEnabled then return end
-    if not data or not data.RollId then return end
-    
-    local rollId = data.RollId
-    pcall(function()
-        RollAnimationDoneEvent:FireServer(rollId)
-    end)
-    
-    if AutoRollEnabled and _G.AlphaScriptExecutionId == currentExecId then
-        task.wait(1)
+    if data and data.RollId then
+        currentRollId = data.RollId
         pcall(function()
-            RollSeedsEvent:FireServer()
+            RollAnimationDoneEvent:FireServer(currentRollId)
         end)
+    else
+        warn("[Alpha Hub] RollSeeds OnClientEvent received invalid data:", tostring(data))
     end
 end)
 
@@ -130,8 +125,21 @@ MainTab:CreateToggle({
     Callback = function(Value)
         AutoRollEnabled = Value
         if AutoRollEnabled then
-            pcall(function()
-                RollSeedsEvent:FireServer()
+            task.spawn(function()
+                while AutoRollEnabled and _G.AlphaScriptExecutionId == currentExecId do
+                    currentRollId = nil
+                    pcall(function()
+                        RollSeedsEvent:FireServer()
+                    end)
+                    
+                    local elapsed = 0
+                    while not currentRollId and elapsed < 3 and AutoRollEnabled and _G.AlphaScriptExecutionId == currentExecId do
+                        task.wait(0.1)
+                        elapsed = elapsed + 0.1
+                    end
+                    
+                    task.wait(1)
+                end
             end)
         end
     end,
