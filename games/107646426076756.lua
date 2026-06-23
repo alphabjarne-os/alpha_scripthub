@@ -1005,6 +1005,37 @@ MainTab:CreateToggle({
     end,
 })
 
+local DetectedRarityLabel = MainTab:CreateLabel("Auto-Detect: Disabled")
+
+task.spawn(function()
+    while _G.AlphaScriptExecutionId == currentExecId do
+        if AutoDetectRarities then
+            local currentMoney = getMyMoney()
+            local maxAffordableCost = 0
+            local bestPlant = nil
+            local bestPlantName = "None"
+            for name, pData in pairs(PlantsConfig) do
+                if pData.Cost and pData.Cost <= currentMoney then
+                    if pData.Cost > maxAffordableCost then
+                        maxAffordableCost = pData.Cost
+                        bestPlant = pData
+                        bestPlantName = name
+                    end
+                end
+            end
+            
+            if bestPlant then
+                DetectedRarityLabel:Set("Auto-Detect: " .. tostring(bestPlant.Rarity) .. " (" .. tostring(bestPlantName) .. ")")
+            else
+                DetectedRarityLabel:Set("Auto-Detect: None (Insufficient Cash)")
+            end
+        else
+            DetectedRarityLabel:Set("Auto-Detect: Disabled")
+        end
+        task.wait(1)
+    end
+end)
+
 local rarityOptions = {}
 table.insert(rarityOptions, "Other")
 for _, rarityInfo in ipairs(sortedRarities) do
