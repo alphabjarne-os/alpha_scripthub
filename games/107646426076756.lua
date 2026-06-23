@@ -110,7 +110,7 @@ local function addFloorSection(floorId, displayName)
         if not surfaceGui then return end
         
         local FloorTab = Window:CreateTab(displayName, 4483362458)
-        FloorTab:CreateSection(displayName .. " Upgrades")
+        FloorTab:CreateSection("Auto Upgrades")
         
         task.wait(0.5)
         
