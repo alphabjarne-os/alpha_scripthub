@@ -428,7 +428,7 @@ local AutoPlantBest = false
 MainTab:CreateToggle({
     Name = "Auto Plant Best",
     CurrentValue = false,
-    Flag = "AlphaAutoPlantBest_" .. floorId,
+    Flag = "AlphaAutoPlantBest_" .. 1,
     Callback = function(Value)
         AutoPlantBest = Value
         if AutoPlantBest then
@@ -436,7 +436,7 @@ MainTab:CreateToggle({
                 while AutoPlantBest and _G.AlphaScriptExecutionId == currentExecId do
                     if not myPlot then myPlot = findMyPlot() end
                     if myPlot then
-                        local farmPlot = findFarmPlot(floorId)
+                        local farmPlot = findFarmPlot(1)
                         if farmPlot then
                             local children = farmPlot:GetChildren()
                             local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
