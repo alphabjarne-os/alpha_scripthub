@@ -807,115 +807,111 @@ local function addFloorSection(floorId, displayName)
                                 local farmPlot = findFarmPlot(floorId)
                                 if farmPlot then
                                     local children = farmPlot:GetChildren()
-                                    local toolsToSearch = {}
-                                    for _, t in ipairs(player.Backpack:GetChildren()) do
-                                        table.insert(toolsToSearch, t)
-                                    end
-                                    for _, t in ipairs(player.Character:GetChildren()) do
-                                        table.insert(toolsToSearch, t)
-                                    end
-                                    local seeds = {}
-                                    for _, tool in ipairs(toolsToSearch) do
-                                        if tool:IsA("Tool") and tool:GetAttribute("InventoryCategory") == "Seeds" then
-                                            local plantName = tool:GetAttribute("Plant")
-                                            local plantData = PlantsConfig[plantName]
-                                            local cost = plantData and plantData.Cost or 0
-                                            local qty = tonumber(tool.Name:match("%[x(%d+)%]")) or 1
-                                            table.insert(seeds, {
-                                                tool = tool,
-                                                plantName = plantName,
-                                                cost = cost,
-                                                qty = qty
-                                            })
-                                        end
-                                    end
-                                    table.sort(seeds, function(a, b)
-                                        return a.cost > b.cost
-                                    end)
-                                    local slots = {}
-                                    for _, slot in ipairs(children) do
-                                        local dirt = slot:FindFirstChild("Dirt")
-                                        local isUnlocked = slot:GetAttribute("Unlocked") == true
-                                        if dirt and isUnlocked then
-                                            local crop = getSlotCrop(slot)
-                                            local cropName = crop and (crop:GetAttribute("Plant") or crop.Name) or nil
-                                            local plantData = cropName and PlantsConfig[cropName]
-                                            local cropCost = plantData and plantData.Cost or 0
-                                            local isGrown = crop and isCropGrown(crop) or false
-                                            table.insert(slots, {
-                                                slot = slot,
-                                                dirt = dirt,
-                                                crop = crop,
-                                                cropCost = cropCost,
-                                                isGrown = isGrown
-                                            })
-                                        end
-                                    end
-                                    table.sort(slots, function(a, b)
-                                        local prioA = (not a.crop or a.isGrown) and 1 or 2
-                                        local prioB = (not b.crop or b.isGrown) and 1 or 2
-                                        if prioA ~= prioB then
-                                            return prioA < prioB
-                                        end
-                                        return a.cropCost < b.cropCost
-                                    end)
                                     local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
                                     local plantSeed = remotes and remotes:FindFirstChild("PlantSeed")
                                     local removePlant = remotes and remotes:FindFirstChild("RemovePlant")
                                     local equipTool = remotes and remotes:FindFirstChild("EquipTool")
                                     if plantSeed and removePlant then
-                                        local seedIndex = 1
-                                        for _, slotInfo in ipairs(slots) do
-                                            if not AutoPlantBest or _G.AlphaScriptExecutionId ~= currentExecId then break end
-                                            local activeSeed = nil
-                                            while seedIndex <= #seeds do
-                                                local s = seeds[seedIndex]
-                                                if s.qty > 0 then
-                                                    activeSeed = s
-                                                    break
-                                                else
-                                                    seedIndex = seedIndex + 1
+                                        local lastTargetDirt = nil
+                                        local targetAttempts = 0
+                                        while AutoPlantBest and _G.AlphaScriptExecutionId == currentExecId do
+                                            local bestTool = nil
+                                            local bestCost = -1
+                                            local toolsToSearch = {}
+                                            for _, t in ipairs(player.Backpack:GetChildren()) do
+                                                table.insert(toolsToSearch, t)
+                                            end
+                                            for _, t in ipairs(player.Character:GetChildren()) do
+                                                table.insert(toolsToSearch, t)
+                                            end
+                                            for _, tool in ipairs(toolsToSearch) do
+                                                if tool:IsA("Tool") and tool:GetAttribute("InventoryCategory") == "Seeds" then
+                                                    local plantName = tool:GetAttribute("Plant")
+                                                    local plantData = PlantsConfig[plantName]
+                                                    local cost = plantData and plantData.Cost or 0
+                                                    if cost > bestCost then
+                                                        bestCost = cost
+                                                        bestTool = tool
+                                                    end
                                                 end
                                             end
-                                            if not activeSeed then break end
-                                            local dirt = slotInfo.dirt
-                                            local crop = slotInfo.crop
-                                            local cropCost = slotInfo.cropCost
-                                            local isGrown = slotInfo.isGrown
-                                            if not crop or isGrown then
-                                                if isGrown then
+                                            if not bestTool then
+                                                break
+                                            end
+                                            local slots = {}
+                                            for _, slot in ipairs(children) do
+                                                local dirt = slot:FindFirstChild("Dirt")
+                                                local isUnlocked = slot:GetAttribute("Unlocked") == true
+                                                if dirt and isUnlocked then
+                                                    local crop = getSlotCrop(slot)
+                                                    local cropName = crop and (crop:GetAttribute("Plant") or crop.Name) or nil
+                                                    local plantData = cropName and PlantsConfig[cropName]
+                                                    local cropCost = plantData and plantData.Cost or 0
+                                                    local isGrown = crop and isCropGrown(crop) or false
+                                                    table.insert(slots, {
+                                                        dirt = dirt,
+                                                        crop = crop,
+                                                        cropCost = cropCost,
+                                                        isGrown = isGrown
+                                                    })
+                                                end
+                                            end
+                                            table.sort(slots, function(a, b)
+                                                local prioA = (not a.crop or a.isGrown) and 1 or 2
+                                                local prioB = (not b.crop or b.isGrown) and 1 or 2
+                                                if prioA ~= prioB then
+                                                    return prioA < prioB
+                                                end
+                                                return a.cropCost < b.cropCost
+                                            end)
+                                            local target = slots[1]
+                                            if not target then
+                                                break
+                                            end
+                                            if target.dirt == lastTargetDirt then
+                                                targetAttempts = targetAttempts + 1
+                                                if targetAttempts > 5 then
+                                                    task.wait(0.1)
+                                                    if targetAttempts > 10 then
+                                                        break
+                                                    end
+                                                end
+                                            else
+                                                lastTargetDirt = target.dirt
+                                                targetAttempts = 1
+                                            end
+                                            if not target.crop or target.isGrown then
+                                                if target.isGrown then
                                                     pcall(function()
-                                                        removePlant:FireServer(dirt)
+                                                        removePlant:FireServer(target.dirt)
                                                     end)
                                                     task.wait(0.02)
                                                 end
-                                                if activeSeed.tool.Parent ~= player.Character and equipTool then
+                                                if bestTool.Parent ~= player.Character and equipTool then
                                                     pcall(function()
-                                                        equipTool:FireServer(activeSeed.tool)
+                                                        equipTool:FireServer(bestTool)
                                                     end)
                                                     task.wait(0.02)
                                                 end
                                                 pcall(function()
-                                                    plantSeed:FireServer(dirt)
+                                                    plantSeed:FireServer(target.dirt)
                                                 end)
-                                                activeSeed.qty = activeSeed.qty - 1
                                                 task.wait(0.02)
                                             else
-                                                if activeSeed.cost > cropCost then
+                                                if bestCost > target.cropCost then
                                                     pcall(function()
-                                                        removePlant:FireServer(dirt)
+                                                        removePlant:FireServer(target.dirt)
                                                     end)
                                                     task.wait(0.02)
-                                                    if activeSeed.tool.Parent ~= player.Character and equipTool then
+                                                    if bestTool.Parent ~= player.Character and equipTool then
                                                         pcall(function()
-                                                            equipTool:FireServer(activeSeed.tool)
+                                                            equipTool:FireServer(bestTool)
                                                         end)
                                                         task.wait(0.02)
                                                     end
                                                     pcall(function()
-                                                        plantSeed:FireServer(dirt)
+                                                        plantSeed:FireServer(target.dirt)
                                                     end)
-                                                    activeSeed.qty = activeSeed.qty - 1
                                                     task.wait(0.02)
                                                 else
                                                     break
