@@ -130,8 +130,7 @@ MainTab:CreateButton({
         local discardSeed = remotes and remotes:FindFirstChild("DiscardSeed")
         if equipTool and discardSeed then
             task.spawn(function()
-                local lastTool = nil
-                local attempts = 0
+                local failedAttempts = 0
                 while true do
                     local foundTool = nil
                     for _, tool in ipairs(player.Backpack:GetChildren()) do
@@ -151,19 +150,7 @@ MainTab:CreateButton({
                     if not foundTool then
                         break
                     end
-                    if foundTool == lastTool then
-                        attempts = attempts + 1
-                        if attempts > 5 then
-                            task.wait(0.1)
-                            if attempts > 10 then
-                                warn("[Alpha Hub] Failed to discard tool: " .. tostring(foundTool.Name))
-                                break
-                            end
-                        end
-                    else
-                        lastTool = foundTool
-                        attempts = 1
-                    end
+                    local currentCount = tonumber(foundTool.Name:match("%[[xX](%d+)%]")) or 1
                     pcall(function()
                         equipTool:FireServer(foundTool)
                     end)
@@ -171,7 +158,29 @@ MainTab:CreateButton({
                     pcall(function()
                         discardSeed:FireServer()
                     end)
-                    task.wait(0.05)
+                    local start = tick()
+                    local updated = false
+                    while tick() - start < 0.5 do
+                        if not foundTool.Parent then
+                            updated = true
+                            break
+                        end
+                        local newCount = tonumber(foundTool.Name:match("%[[xX](%d+)%]")) or 1
+                        if newCount < currentCount then
+                            updated = true
+                            break
+                        end
+                        task.wait(0.01)
+                    end
+                    if updated then
+                        failedAttempts = 0
+                    else
+                        failedAttempts = failedAttempts + 1
+                        if failedAttempts >= 3 then
+                            warn("[Alpha Hub] Failed to discard tool: " .. tostring(foundTool.Name))
+                            break
+                        end
+                    end
                 end
             end)
         end
