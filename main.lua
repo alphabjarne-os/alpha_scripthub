@@ -6,9 +6,29 @@ local function freshGet(url)
     return nil
 end
 
-if game:GetService("CoreGui"):FindFirstChild("Rayfield") then
-    game:GetService("CoreGui").Rayfield:Destroy()
+local function destroyOldGui()
+    if _G.AlphaWindow then
+        pcall(function()
+            _G.AlphaWindow:Destroy()
+        end)
+        _G.AlphaWindow = nil
+    end
+
+    local coreGui = game:GetService("CoreGui")
+    local player = game:GetService("Players").LocalPlayer
+    local playerGui = player and player:FindFirstChildOfClass("PlayerGui")
+    
+    for _, parent in ipairs({coreGui, playerGui}) do
+        if parent then
+            local oldGui = parent:FindFirstChild("Rayfield")
+            if oldGui then
+                pcall(function() oldGui:Destroy() end)
+            end
+        end
+    end
 end
+
+destroyOldGui()
 
 _G.AlphaScriptExecutionId = (_G.AlphaScriptExecutionId or 0) + 1
 

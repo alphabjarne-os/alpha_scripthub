@@ -122,7 +122,11 @@ local function addFloorSection(floorId, displayName)
                 if txt then
                     local uiFrameName = child.Name
                     local remoteUpgradeName = uiFrameName
-                    if not remoteUpgradeName:find("^Extra") then
+                    if remoteUpgradeName:find("Yield") then
+                        remoteUpgradeName = "ExtraYield"
+                    elseif remoteUpgradeName:find("Power") then
+                        remoteUpgradeName = "ExtraPower"
+                    elseif not remoteUpgradeName:find("^Extra") then
                         remoteUpgradeName = "Extra" .. remoteUpgradeName
                     end
                     
