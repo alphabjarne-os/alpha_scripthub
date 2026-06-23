@@ -28,16 +28,28 @@ if scriptContent and not scriptContent:find("404") and not scriptContent:find("N
         KeySystem = false,
     })
     
-    local runSuccess, runError = pcall(function()
-        local func = loadstring(scriptContent)
-        if func then
-            func()
-        else
-            error("Failed to compile script")
-        end
-    end)
+    local func, compileError = loadstring(scriptContent)
     
-    if not runSuccess then
-        warn("AlphaHub Error: " .. tostring(runError))
+    if func then
+        local runSuccess, runError = pcall(func)
+        if not runSuccess then
+            warn("!!! ALPHAHUB RUNTIME ERROR !!!")
+            print(tostring(runError))
+            Rayfield:Notify({
+                Name = "Runtime Error",
+                Content = "Script crashed during execution! Check F9 Console.",
+                Duration = 10,
+                Image = 4483362458,
+            })
+        end
+    else
+        warn("!!! ALPHAHUB COMPILATION ERROR (SYNTAX FEHLER) !!!")
+        print(tostring(compileError))
+        Rayfield:Notify({
+            Name = "Syntax Error",
+            Content = "Failed to compile game script! Check F9 Console for details.",
+            Duration = 10,
+            Image = 4483362458,
+        })
     end
 end
