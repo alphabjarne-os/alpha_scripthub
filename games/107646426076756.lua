@@ -126,11 +126,14 @@ local function addFloorSection(floorId, displayName)
                         remoteUpgradeName = "Extra" .. remoteUpgradeName
                     end
                     
+                    local titleObj = child:FindFirstChild("Title")
+                    local cleanDisplayName = titleObj and titleObj.Text or remoteUpgradeName
+                    
                     local toggleKey = floorId .. "_" .. remoteUpgradeName
                     activeToggles[toggleKey] = false
                     
                     FloorTab:CreateToggle({
-                        Name = "Auto " .. remoteUpgradeName .. " Upgrade",
+                        Name = "Auto " .. cleanDisplayName,
                         CurrentValue = false,
                         Flag = "Flag_" .. toggleKey,
                         Callback = function(Value)
