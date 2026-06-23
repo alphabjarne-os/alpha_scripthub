@@ -752,6 +752,72 @@ MainTab:CreateToggle({
 
 MainTab:CreateSection("Auto Roll")
 
+local function shouldAutoBuySeed(seedName, currentMoney)
+    local plantData = PlantsConfig[seedName]
+    if not plantData then return false end
+    
+    if SelectedRarities["auto-detect"] then
+        local maxAffordableCost = 0
+        local bestPlant = nil
+        for name, pData in pairs(PlantsConfig) do
+            if pData.Cost and pData.Cost <= currentMoney then
+                if pData.Cost > maxAffordableCost then
+                    maxAffordableCost = pData.Cost
+                    bestPlant = pData
+                end
+            end
+        end
+        
+        if maxAffordableCost <= 0 then
+            return true
+        end
+        
+        if plantData.Cost >= maxAffordableCost then
+            return true
+        end
+        
+        local currentRarityOrder = 999
+        local bestRarityOrder = 999
+        
+        local currentRarityLower = plantData.Rarity and plantData.Rarity:lower() or ""
+        local bestRarityLower = bestPlant.Rarity and bestPlant.Rarity:lower() or ""
+        
+        for _, rarityInfo in ipairs(sortedRarities) do
+            local rNameLower = rarityInfo.Name:lower()
+            if rNameLower == currentRarityLower then
+                currentRarityOrder = rarityInfo.Order
+            end
+            if rNameLower == bestRarityLower then
+                bestRarityOrder = rarityInfo.Order
+            end
+        end
+        
+        if currentRarityOrder >= bestRarityOrder or plantData.Cost >= (maxAffordableCost * 0.6) then
+            return true
+        end
+        
+        return false
+    else
+        local rarity = plantData.Rarity or ""
+        local rarityClean = rarity:match("^%s*(.-)%s*$")
+        local rarityLower = rarityClean:lower()
+        
+        local knownRarity = false
+        for _, rarityInfo in ipairs(sortedRarities) do
+            if rarityInfo.Name:lower() == rarityLower then
+                knownRarity = true
+                break
+            end
+        end
+        
+        if knownRarity then
+            return SelectedRarities[rarityLower] == true
+        else
+            return SelectedRarities["other"] == true
+        end
+    end
+end
+
 local function checkAndBuySeeds()
     if not lastSlotsData then return end
     if not myPlot then myPlot = findMyPlot() end
@@ -767,26 +833,8 @@ local function checkAndBuySeeds()
             if val == seedName then
                 local plantData = PlantsConfig[seedName]
                 if plantData then
-                    local rarity = plantData.Rarity
                     local cost = plantData.Cost
-                    
-                    local rarityClean = rarity:match("^%s*(.-)%s*$")
-                    local rarityLower = rarityClean:lower()
-                    
-                    local knownRarity = false
-                    for _, rarityInfo in ipairs(sortedRarities) do
-                        if rarityInfo.Name:lower() == rarityLower then
-                            knownRarity = true
-                            break
-                        end
-                    end
-                    
-                    local shouldBuy = false
-                    if knownRarity then
-                        shouldBuy = SelectedRarities[rarityLower] == true
-                    else
-                        shouldBuy = SelectedRarities["other"] == true
-                    end
+                    local shouldBuy = shouldAutoBuySeed(seedName, currentMoney)
                     
                     if shouldBuy and currentMoney >= cost then
                         if BuySeedEvent then
@@ -876,26 +924,8 @@ rollConnection = RollSeedsEvent.OnClientEvent:Connect(function(arg1, arg2)
                     if seedName then
                         local plantData = PlantsConfig[seedName]
                         if plantData then
-                            local rarity = plantData.Rarity
                             local cost = plantData.Cost
-                            
-                            local rarityClean = rarity:match("^%s*(.-)%s*$")
-                            local rarityLower = rarityClean:lower()
-                            
-                            local knownRarity = false
-                            for _, rarityInfo in ipairs(sortedRarities) do
-                                if rarityInfo.Name:lower() == rarityLower then
-                                    knownRarity = true
-                                    break
-                                end
-                            end
-                            
-                            local shouldBuy = false
-                            if knownRarity then
-                                shouldBuy = SelectedRarities[rarityLower] == true
-                            else
-                                shouldBuy = SelectedRarities["other"] == true
-                            end
+                            local shouldBuy = shouldAutoBuySeed(seedName, currentMoney)
                             
                             if shouldBuy and currentMoney >= cost then
                                 if BuySeedEvent then
@@ -964,6 +994,7 @@ MainTab:CreateToggle({
 MainTab:CreateSection("Auto Buy Rarities")
 
 local rarityOptions = {}
+table.insert(rarityOptions, "Auto-Detect")
 table.insert(rarityOptions, "Other")
 for _, rarityInfo in ipairs(sortedRarities) do
     table.insert(rarityOptions, rarityInfo.Name)
