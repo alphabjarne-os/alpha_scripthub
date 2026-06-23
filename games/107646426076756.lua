@@ -96,6 +96,7 @@ local isProcessingRoll = false
 local lastSlotsData = nil
 
 local SelectedRarities = {}
+local BlacklistedRarities = {}
 local AutoDetectRarities = false
 local sortedRarities = {}
 local seenRarities = {}
@@ -120,6 +121,20 @@ end
 table.sort(sortedRarities, function(a, b)
     return a.Order < b.Order
 end)
+
+local function isRarityBlacklisted(rarity)
+    if not rarity then return false end
+    local rarityLower = rarity:lower()
+    local isKnownRarity = false
+    for _, rarityInfo in ipairs(sortedRarities) do
+        if rarityInfo.Name:lower() == rarityLower then
+            isKnownRarity = true
+            break
+        end
+    end
+    local keyToCheck = isKnownRarity and rarityLower or "other"
+    return BlacklistedRarities[keyToCheck] == true
+end
 
 local function getSlotCrop(slot)
     for _, child in ipairs(slot:GetChildren()) do
@@ -811,10 +826,13 @@ local function shouldAutoBuySeed(seedName, currentMoney)
     if not plantData then return false end
     
     if AutoDetectRarities then
+        if isRarityBlacklisted(plantData.Rarity) then return false end
+        
         local maxAffordableCost = 0
         local bestPlant = nil
         for name, pData in pairs(PlantsConfig) do
             if type(pData) ~= "table" then continue end
+            if isRarityBlacklisted(pData.Rarity) then continue end
             local pCost = pData.Cost or 0
             if pCost > 0 and pCost <= currentMoney then
                 if pCost > maxAffordableCost then
@@ -1072,12 +1090,14 @@ task.spawn(function()
                 local bestPlantName = "None"
                 for name, pData in pairs(PlantsConfig) do
                     if type(pData) == "table" then
-                        local pCost = pData.Cost or 0
-                        if pCost > 0 and pCost <= currentMoney then
-                            if pCost > maxAffordableCost then
-                                maxAffordableCost = pCost
-                                bestPlant = pData
-                                bestPlantName = name
+                        if not isRarityBlacklisted(pData.Rarity) then
+                            local pCost = pData.Cost or 0
+                            if pCost > 0 and pCost <= currentMoney then
+                                if pCost > maxAffordableCost then
+                                    maxAffordableCost = pCost
+                                    bestPlant = pData
+                                    bestPlantName = name
+                                end
                             end
                         end
                     end
@@ -1119,6 +1139,25 @@ MainTab:CreateDropdown({
             end
         elseif type(Option) == "string" then
             SelectedRarities[Option:lower()] = true
+        end
+        task.spawn(checkAndBuySeeds)
+    end,
+})
+
+MainTab:CreateDropdown({
+    Name = "Auto-Detect Blacklist",
+    Options = rarityOptions,
+    CurrentOption = {},
+    MultipleOptions = true,
+    Flag = "AlphaAutoDetectBlacklistDropdown",
+    Callback = function(Option)
+        BlacklistedRarities = {}
+        if type(Option) == "table" then
+            for _, opt in ipairs(Option) do
+                BlacklistedRarities[opt:lower()] = true
+            end
+        elseif type(Option) == "string" then
+            BlacklistedRarities[Option:lower()] = true
         end
         task.spawn(checkAndBuySeeds)
     end,
