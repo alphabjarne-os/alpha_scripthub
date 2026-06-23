@@ -372,8 +372,9 @@ MainTab:CreateToggle({
                             local bases = floorData.PlotUnlockBase
                             local growth = floorData.PlotUnlockGrowth or 1.4
                             local base = bases and (bases[farmPlotStage] or bases[#bases] or 25) or 25
-                            warn(floorData)
+                            warn(bases,base,growth)
                             cost = base * (growth ^ (plotKey - 1))
+                            warn(cost)
                         end
                     end
                     if not cost or cost <= 0 then continue end
