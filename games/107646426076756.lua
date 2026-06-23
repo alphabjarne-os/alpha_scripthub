@@ -428,7 +428,7 @@ local AutoPlantBest = false
 MainTab:CreateToggle({
     Name = "Auto Plant Best",
     CurrentValue = false,
-    Flag = "AlphaAutoPlantBest_Floor1",
+    Flag = "AlphaAutoPlantBest_" .. floorId,
     Callback = function(Value)
         AutoPlantBest = Value
         if AutoPlantBest then
@@ -436,7 +436,7 @@ MainTab:CreateToggle({
                 while AutoPlantBest and _G.AlphaScriptExecutionId == currentExecId do
                     if not myPlot then myPlot = findMyPlot() end
                     if myPlot then
-                        local farmPlot = myPlot:FindFirstChild("FarmPlot")
+                        local farmPlot = findFarmPlot(floorId)
                         if farmPlot then
                             local children = farmPlot:GetChildren()
                             local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
@@ -473,21 +473,8 @@ MainTab:CreateToggle({
                                     local slots = {}
                                     for _, slot in ipairs(children) do
                                         local dirt = slot:FindFirstChild("Dirt")
-                                        local isUnlocked = slot:GetAttribute("Unlocked")
-                                        local isLocked
-                                        if isUnlocked ~= nil then
-                                            isLocked = not isUnlocked
-                                        else
-                                            isLocked = slot:GetAttribute("Locked")
-                                            if isLocked == nil then
-                                                isLocked = slot:GetAttribute("IsLocked")
-                                            end
-                                            if isLocked == nil then
-                                                isLocked = slot:FindFirstChild("Lock") ~= nil or (dirt.Transparency > 0.1)
-                                            end
-                                        end
-                                        local isSlotUnlocked = not isLocked
-                                        if dirt and isSlotUnlocked then
+                                        local isUnlocked = slot:GetAttribute("Unlocked") == true
+                                        if dirt and isUnlocked then
                                             local crop = getSlotCrop(slot)
                                             local cropName = crop and (crop:GetAttribute("Plant") or crop.Name) or nil
                                             local plantData = cropName and PlantsConfig[cropName]
