@@ -183,33 +183,7 @@ rollConnection = RollSeedsEvent.OnClientEvent:Connect(function(arg1, arg2)
         end)
         
         if slots then
-            if not myPlot then myPlot = findMyPlot() end
-            local roller = myPlot and myPlot:FindFirstChild("SeedRoller")
-            if roller then
-                local startWait = tick()
-                local matchedAll = false
-                while tick() - startWait < 5 and _G.AlphaScriptExecutionId == currentExecId do
-                    local allMatch = true
-                    for slotIndex, slot in ipairs(slots) do
-                        local seedName = slot.Seed
-                        if seedName then
-                            local val = roller:GetAttribute("RolledSeed" .. tostring(slotIndex))
-                            if val ~= seedName then
-                                allMatch = false
-                                break
-                            end
-                        end
-                    end
-                    if allMatch then
-                        matchedAll = true
-                        break
-                    end
-                    task.wait(0.05)
-                end
-                if matchedAll then
-                    task.wait(0.2)
-                end
-            end
+            task.wait(0.05)
             local currentMoney = getMyMoney()
             for slotIndex, slot in ipairs(slots) do
                 local seedName = slot.Seed
