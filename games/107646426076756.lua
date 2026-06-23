@@ -333,95 +333,84 @@ MainTab:CreateToggle({
     Flag = "AlphaAutoBuyGround_Floor1",
     Callback = function(Value)
         AutoUnlockGround = Value
-        if AutoUnlockGround then
-            task.spawn(function()
-                while AutoUnlockGround and _G.AlphaScriptExecutionId == currentExecId do
-                    if not myPlot then myPlot = findMyPlot() end
-                    if myPlot then
-                        local currentMoney = getMyMoney()
-                        local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
-                        local unlockPlot = remotes and remotes:FindFirstChild("UnlockPlot")
-                        if unlockPlot then
-                            local farmPlot = myPlot:FindFirstChild("FarmPlot")
-                            if farmPlot then
-                                local children = farmPlot:GetChildren()
-                                table.sort(children, function(a, b)
-                                    local numA = tonumber(a.Name:match("%d+")) or 0
-                                    local numB = tonumber(b.Name:match("%d+")) or 0
-                                    return numA < numB
-                                end)
-                                for _, child in ipairs(children) do
-                                    local dirt = child:FindFirstChild("Dirt")
-                                    if dirt then
-                                        local isUnlocked = child:GetAttribute("Unlocked")
-                                        local isLocked
-                                        if isUnlocked ~= nil then
-                                            isLocked = not isUnlocked
-                                        else
-                                            isLocked = child:GetAttribute("Locked")
-                                            if isLocked == nil then
-                                                isLocked = child:GetAttribute("IsLocked")
-                                            end
-                                            if isLocked == nil then
-                                                isLocked = child:FindFirstChild("Lock") ~= nil or (dirt.Transparency > 0.1)
-                                            end
-                                        end
-                                        if isLocked then
-                                            local plotKey = child:GetAttribute("PlotKey") or tonumber(child.Name:match("%d+")) or 1
-                                            local ring = math.floor((plotKey - 1) / 10) + 1
-                                            local farmPlotStage = farmPlot:GetAttribute("FarmPlotStage") or farmPlot:GetAttribute("Stage") or myPlot:GetAttribute("FarmPlotStage_Floor1") or myPlot:GetAttribute("Stage_Floor1") or farmPlot:GetAttribute("FarmPlotStage_Floor1") or 1
-                                            if ring <= farmPlotStage then
-                                                local cost = nil
-                                                local rawCost = child:GetAttribute("Cost") or child:GetAttribute("Price") or child:GetAttribute("UnlockCost") or dirt:GetAttribute("Cost") or dirt:GetAttribute("Price") or dirt:GetAttribute("UnlockCost")
-                                                if type(rawCost) == "number" then
-                                                    cost = rawCost
-                                                elseif type(rawCost) == "string" then
-                                                    cost = parseShortenedNumber(rawCost)
-                                                end
-                                                if not cost or cost <= 0 then
-                                                    local lock = child:FindFirstChild("Lock")
-                                                    if lock then
-                                                        local textLabel = lock:FindFirstChildWhichIsA("TextLabel", true)
-                                                        if textLabel then
-                                                            local parsed = parseShortenedNumber(textLabel.Text)
-                                                            if parsed > 0 then
-                                                                 cost = parsed
-                                                            end
-                                                        end
-                                                    end
-                                                end
-                                                if not cost or cost <= 0 then
-                                                    local floorIndex = 1
-                                                    local floorData = Configuration and Configuration.FloorConfig and Configuration.FloorConfig[floorIndex]
-                                                    if floorData then
-                                                        local bases = floorData.PlotUnlockBase
-                                                        local growth = floorData.PlotUnlockGrowth or 1.4
-                                                        local idx = plotKey
-                                                        local base = bases and (bases[farmPlotStage] or bases[#bases] or 25) or 25
-                                                        cost = base * (growth ^ (idx - 1))
-                                                    else
-                                                        cost = 0
-                                                    end
-                                                end
-                                                if cost and cost > 0 and currentMoney >= cost then
-                                                    print(cost)
-                                                    pcall(function()
-                                                        unlockPlot:FireServer(dirt)
-                                                    end)
-                                                    currentMoney = getMyMoney()
-                                                    task.wait(0.1)
-                                                end
-                                            end
-                                        end
-                                    end
-                                end
-                            end
+        if not AutoUnlockGround then return end
+        task.spawn(function()
+            local Remotes = game:GetService("ReplicatedStorage"):WaitForChild("Remotes", 5)
+            local unlockPlotRemote = Remotes and Remotes:FindFirstChild("UnlockPlot")
+            while AutoUnlockGround and _G.AlphaScriptExecutionId == currentExecId do
+                if not myPlot then myPlot = findMyPlot() end
+                if not unlockPlotRemote then unlockPlotRemote = Remotes and Remotes:FindFirstChild("UnlockPlot") end
+                local farmPlot = myPlot and myPlot:FindFirstChild("FarmPlot")
+                if not farmPlot or not unlockPlotRemote then 
+                    task.wait(1)
+                    continue 
+                end
+                local children = farmPlot:GetChildren()
+                table.sort(children, function(a, b)
+                    local numA = tonumber(a.Name:match("%d+")) or 0
+                    local numB = tonumber(b.Name:match("%d+")) or 0
+                    return numA < numB
+                end)
+                local farmPlotStage = farmPlot:GetAttribute("FarmPlotStage") or farmPlot:GetAttribute("Stage") or 
+                                      myPlot:GetAttribute("FarmPlotStage_Floor1") or myPlot:GetAttribute("Stage_Floor1") or 1
+                for _, child in ipairs(children) do
+                    if not AutoUnlockGround or _G.AlphaScriptExecutionId ~= currentExecId then break end
+                    local dirt = child:FindFirstChild("Dirt")
+                    if not dirt then continue end
+                    local isUnlocked = child:GetAttribute("Unlocked")
+                    local isLocked
+                    if isUnlocked ~= nil then
+                        isLocked = not isUnlocked
+                    else
+                        isLocked = child:GetAttribute("Locked")
+                        if isLocked == nil then isLocked = child:GetAttribute("IsLocked") end
+                        if isLocked == nil then 
+                            isLocked = child:FindFirstChild("Lock") ~= nil or (dirt.Transparency > 0.1) 
                         end
                     end
-                    task.wait(1)
+                    if not isLocked then continue end
+                    local plotKey = child:GetAttribute("PlotKey") or tonumber(child.Name:match("%d+")) or 1
+                    local ring = math.floor((plotKey - 1) / 10) + 1
+                    if ring > farmPlotStage then continue end
+                    local cost = nil
+                    local rawCost = child:GetAttribute("Cost") or child:GetAttribute("Price") or child:GetAttribute("UnlockCost") or 
+                                    dirt:GetAttribute("Cost") or dirt:GetAttribute("Price") or dirt:GetAttribute("UnlockCost")
+                    if type(rawCost) == "number" then
+                        cost = rawCost
+                    elseif type(rawCost) == "string" then
+                        cost = parseShortenedNumber(rawCost)
+                    end
+                    if not cost or cost <= 0 then
+                        local lock = child:FindFirstChild("Lock")
+                        local textLabel = lock and lock:FindFirstChildWhichIsA("TextLabel", true)
+                        if textLabel then
+                            local parsed = parseShortenedNumber(textLabel.Text)
+                            if parsed > 0 then cost = parsed end
+                        end
+                    end
+                    if not cost or cost <= 0 then
+                        local floorData = Configuration and Configuration.FloorConfig and Configuration.FloorConfig[1]
+                        if floorData then
+                            local bases = floorData.PlotUnlockBase
+                            local growth = floorData.PlotUnlockGrowth or 1.4
+                            local base = bases and (bases[farmPlotStage] or bases[#bases] or 25) or 25
+                            cost = base * (growth ^ (plotKey - 1))
+                        else
+                            cost = 0
+                        end
+                    end
+                    local currentMoney = getMyMoney()
+                    if cost and cost > 0 and currentMoney >= cost then
+                        pcall(function()
+                            unlockPlotRemote:FireServer(dirt)
+                        end)
+                        task.wait(0.1)
+                    end
                 end
-            end)
-        end
+
+                task.wait(1)
+            end
+        end)
     end,
 })
 
