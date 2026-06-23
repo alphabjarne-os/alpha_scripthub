@@ -629,6 +629,52 @@ task.spawn(function()
     end
 end)
 
+local function getMainUpgradeInfo(upgradeName)
+    local level = 1
+    local price = 0
+    if not myPlot then myPlot = findMyPlot() end
+    if myPlot then
+        local sign = myPlot:FindFirstChild("UpgradeSign")
+        local screen = sign and sign:FindFirstChild("Screen")
+        local surfaceGui = screen and screen:FindFirstChild("SurfaceGui")
+        if surfaceGui then
+            local frameName = upgradeName
+            if upgradeName == "UpgradeSeedRolls" then
+                frameName = "SeedStands"
+            elseif upgradeName == "UpgradeSeedLuck" then
+                frameName = "SeedLuck"
+            elseif upgradeName == "UpgradeFarm" then
+                frameName = "UpgradeFarm"
+                if not surfaceGui:FindFirstChild(frameName) then
+                    frameName = "Expand"
+                end
+                if not surfaceGui:FindFirstChild(frameName) then
+                    frameName = "Farm"
+                end
+            end
+            local frame = surfaceGui:FindFirstChild(frameName)
+            if frame then
+                local btn = frame:FindFirstChild("Btn")
+                local txt = btn and btn:FindFirstChild("Txt")
+                if txt then
+                    price = parseShortenedNumber(txt.Text)
+                end
+                if upgradeName == "UpgradeSeedLuck" then
+                    local desc = frame:FindFirstChild("Desc")
+                    if desc then
+                        level = tonumber(desc.Text:match("^(%d+)")) or 1
+                    end
+                elseif upgradeName == "UpgradeSeedRolls" then
+                    level = myPlot:GetAttribute("SeedStands") or 1
+                elseif upgradeName == "UpgradeFarm" then
+                    level = myPlot:GetAttribute("FarmPlotStage") or 1
+                end
+            end
+        end
+    end
+    return price, level
+end
+
 task.spawn(function()
     while _G.AlphaScriptExecutionId == currentExecId do
         if AutoUpgradeSeedRolls or AutoUpgradeSeedLuck or AutoUpgradeFarm then
@@ -638,22 +684,18 @@ task.spawn(function()
                 local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
                 
                 if AutoUpgradeSeedRolls then
-                    local rollsLevel = 1
-                    for attrName, value in pairs(myPlot:GetAttributes()) do
-                        if attrName:lower():find("rolls") then
-                            rollsLevel = value
-                            break
-                        end
+                    local price, level = getMainUpgradeInfo("UpgradeSeedRolls")
+                    if price == 0 then
+                        price = Configuration and Configuration.ExtraSeedRollsCosts and Configuration.ExtraSeedRollsCosts[level + 1] or 0
                     end
-                    local cost = Configuration and Configuration.ExtraSeedRollsCosts and Configuration.ExtraSeedRollsCosts[rollsLevel + 1] or 0
-                    if cost > 0 and currentMoney >= cost then
+                    if price > 0 and currentMoney >= price then
                         local remote = remotes and remotes:FindFirstChild("UpgradeSeedRolls")
                         if remote then
                             local success = pcall(function()
                                 remote:InvokeServer()
                             end)
                             if success then
-                                currentMoney = currentMoney - cost
+                                currentMoney = currentMoney - price
                                 task.wait(0.1)
                             end
                         end
@@ -661,22 +703,18 @@ task.spawn(function()
                 end
                 
                 if AutoUpgradeSeedLuck then
-                    local luckLevel = 1
-                    for attrName, value in pairs(myPlot:GetAttributes()) do
-                        if attrName:lower():find("luck") then
-                            luckLevel = value
-                            break
-                        end
+                    local price, level = getMainUpgradeInfo("UpgradeSeedLuck")
+                    if price == 0 then
+                        price = math.floor(60 * (1.35 ^ (level - 1)))
                     end
-                    local cost = math.floor(60 * (1.35 ^ (luckLevel - 1)))
-                    if currentMoney >= cost then
+                    if price > 0 and currentMoney >= price then
                         local remote = remotes and remotes:FindFirstChild("UpgradeSeedLuck")
                         if remote then
                             local success = pcall(function()
                                 remote:InvokeServer()
                             end)
                             if success then
-                                currentMoney = currentMoney - cost
+                                currentMoney = currentMoney - price
                                 task.wait(0.1)
                             end
                         end
@@ -684,16 +722,18 @@ task.spawn(function()
                 end
                 
                 if AutoUpgradeFarm then
-                    local farmStage = myPlot:GetAttribute("FarmPlotStage") or 1
-                    local cost = Configuration and Configuration.FarmExpandCosts and Configuration.FarmExpandCosts[farmStage + 1] or 0
-                    if cost > 0 and currentMoney >= cost then
+                    local price, level = getMainUpgradeInfo("UpgradeFarm")
+                    if price == 0 then
+                        price = Configuration and Configuration.FarmExpandCosts and Configuration.FarmExpandCosts[level + 1] or 0
+                    end
+                    if price > 0 and currentMoney >= price then
                         local remote = remotes and remotes:FindFirstChild("UpgradeFarm")
                         if remote then
                             local success = pcall(function()
                                 remote:InvokeServer()
                             end)
                             if success then
-                                currentMoney = currentMoney - cost
+                                currentMoney = currentMoney - price
                                 task.wait(0.1)
                             end
                         end
