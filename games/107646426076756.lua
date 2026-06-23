@@ -1005,7 +1005,7 @@ MainTab:CreateToggle({
     end,
 })
 
-local DetectedRarityLabel = MainTab:CreateLabel("Auto-Detect: Disabled")
+local DetectedRarityParagraph = MainTab:CreateParagraph({Title = "Auto-Detect Status", Content = "Auto-Detect: Disabled"})
 
 task.spawn(function()
     while _G.AlphaScriptExecutionId == currentExecId do
@@ -1025,12 +1025,12 @@ task.spawn(function()
             end
             
             if bestPlant then
-                DetectedRarityLabel:Set("Auto-Detect: " .. tostring(bestPlant.Rarity) .. " (" .. tostring(bestPlantName) .. ")")
+                DetectedRarityParagraph:Set({Title = "Auto-Detect Status", Content = "Auto-Detect: " .. tostring(bestPlant.Rarity) .. " (" .. tostring(bestPlantName) .. ")"})
             else
-                DetectedRarityLabel:Set("Auto-Detect: None (Insufficient Cash)")
+                DetectedRarityParagraph:Set({Title = "Auto-Detect Status", Content = "Auto-Detect: None (Insufficient Cash)"})
             end
         else
-            DetectedRarityLabel:Set("Auto-Detect: Disabled")
+            DetectedRarityParagraph:Set({Title = "Auto-Detect Status", Content = "Auto-Detect: Disabled"})
         end
         task.wait(1)
     end
