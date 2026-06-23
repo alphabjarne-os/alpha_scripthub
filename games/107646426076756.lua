@@ -91,17 +91,13 @@ MainTab:CreateToggle({
     end,
 })
 
-local function getSeedRoller()
-    if not myPlot then myPlot = findMyPlot() end
-    return myPlot and myPlot:FindFirstChild("SeedRoller")
-end
-
 MainTab:CreateSection("Auto Roll")
 
 local RollSeedsEvent = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("RollSeeds")
 local RollAnimationDoneEvent = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("RollAnimationDone")
 
 local AutoRollEnabled = false
+local currentRollId = nil
 
 local rollConnection
 rollConnection = RollSeedsEvent.OnClientEvent:Connect(function(arg1, arg2)
@@ -122,6 +118,7 @@ rollConnection = RollSeedsEvent.OnClientEvent:Connect(function(arg1, arg2)
     end
     
     if rollId then
+        currentRollId = rollId
         pcall(function()
             RollAnimationDoneEvent:FireServer(rollId)
         end)
@@ -137,24 +134,14 @@ MainTab:CreateToggle({
         if AutoRollEnabled then
             task.spawn(function()
                 while AutoRollEnabled and _G.AlphaScriptExecutionId == currentExecId do
-                    local seedRoller = getSeedRoller()
-                    if not seedRoller then
-                        task.wait(1)
-                        continue
-                    end
-                    
-                    local lastSeed = seedRoller:GetAttribute("RolledSeed1")
+                    local lastRollId = currentRollId
                     
                     pcall(function()
                         RollSeedsEvent:FireServer()
                     end)
                     
                     local elapsed = 0
-                    while elapsed < 5 and AutoRollEnabled and _G.AlphaScriptExecutionId == currentExecId do
-                        local currentSeed = seedRoller:GetAttribute("RolledSeed1")
-                        if currentSeed and currentSeed ~= "" and currentSeed ~= lastSeed then
-                            break
-                        end
+                    while currentRollId == lastRollId and elapsed < 5 and AutoRollEnabled and _G.AlphaScriptExecutionId == currentExecId do
                         task.wait(0.1)
                         elapsed = elapsed + 0.1
                     end
