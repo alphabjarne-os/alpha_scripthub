@@ -753,14 +753,11 @@ local function addFloorSection(floorId, displayName)
                                                         isLocked = child:FindFirstChild("Lock") ~= nil or (dirt.Transparency > 0.1)
                                                     end
                                                 end
-                                                
                                                 if isLocked then
                                                     local plotKey = child:GetAttribute("PlotKey") or tonumber(child.Name:match("%d+")) or 1
                                                     local ring = math.floor((plotKey - 1) / 10) + 1
-                                                    
                                                     local stageAttr = "FarmPlotStage_" .. floorId
-                                                    local farmPlotStage = farmPlot:GetAttribute(stageAttr) or myPlot:GetAttribute(stageAttr) or 1
-                                                    
+                                                    local farmPlotStage = farmPlot:GetAttribute("FarmPlotStage") or farmPlot:GetAttribute("Stage") or myPlot:GetAttribute(stageAttr) or myPlot:GetAttribute("Stage_" .. floorId) or farmPlot:GetAttribute(stageAttr) or 1
                                                     if ring <= farmPlotStage then
                                                         local cost = child:GetAttribute("Cost") or child:GetAttribute("Price") or child:GetAttribute("UnlockCost")
                                                         if not cost then
@@ -776,9 +773,7 @@ local function addFloorSection(floorId, displayName)
                                                                 cost = 0
                                                             end
                                                         end
-                                                        
                                                         print(string.format("[Alpha Hub] Ground check - Name: %s, PlotKey: %s, Ring: %d, Stage: %d, Cost: %s, Cash: %s", child.Name, tostring(plotKey), ring, farmPlotStage, tostring(cost), tostring(currentMoney)))
-                                                        
                                                         if cost and cost > 0 and currentMoney >= cost then
                                                             pcall(function()
                                                                 unlockPlot:FireServer(dirt)
@@ -786,7 +781,6 @@ local function addFloorSection(floorId, displayName)
                                                             currentMoney = currentMoney - cost
                                                             task.wait(0.1)
                                                         end
-                                                        break
                                                     end
                                                 end
                                             end
