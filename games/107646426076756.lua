@@ -87,6 +87,108 @@ end
 
 local Configuration = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Configuration"))
 
+local function getSlotCrop(slot)
+    for _, child in ipairs(slot:GetChildren()) do
+        if child:IsA("Model") and child.Name ~= "Lock" and child.Name ~= "Dirt" then
+            return child
+        end
+    end
+    local dirt = slot:FindFirstChild("Dirt")
+    if dirt then
+        for _, child in ipairs(dirt:GetChildren()) do
+            if child:IsA("Model") then
+                return child
+            end
+        end
+    end
+    return nil
+end
+
+local function isCropGrown(crop)
+    if not crop then return false end
+    if crop:GetAttribute("Grown") == true or crop:GetAttribute("IsGrown") == true or crop:GetAttribute("Harvestable") == true then
+        return true
+    end
+    local stage = crop:GetAttribute("Stage")
+    local maxStage = crop:GetAttribute("MaxStage")
+    if stage and maxStage and stage >= maxStage then
+        return true
+    end
+    local progress = crop:GetAttribute("Progress")
+    if progress and progress >= 100 then
+        return true
+    end
+    local state = crop:GetAttribute("CropState") or crop:GetAttribute("State")
+    if state and (tostring(state):lower():find("grown") or tostring(state):lower():find("ready") or tostring(state):lower():find("harvest")) then
+        return true
+    end
+    return false
+end
+
+local function findFarmPlot(floorId)
+    if not myPlot then myPlot = findMyPlot() end
+    if not myPlot then return nil end
+    local targetName = "FarmPlot"
+    if floorId ~= "Floor1" then
+        targetName = "FarmPlot_" .. floorId
+    end
+    local fp = myPlot:FindFirstChild(targetName)
+    if fp then return fp end
+    fp = myPlot:FindFirstChild("FarmPlot" .. floorId)
+    if fp then return fp end
+    fp = myPlot:FindFirstChild("FarmPlot")
+    if fp then return fp end
+    for _, child in ipairs(myPlot:GetChildren()) do
+        local name = child.Name:lower()
+        if name:find("farmplot") and name:find(floorId:lower()) then
+            return child
+        end
+    end
+    return nil
+end
+
+local function getUpgradePrice(floorId, remoteUpgradeName, uiFrameName, currentLevel)
+    if myPlot then
+        local sign = myPlot:FindFirstChild("PlotUpgradeSign")
+        local screen = sign and sign:FindFirstChild("Screen")
+        local surfaceGui = screen and screen:FindFirstChild("SurfaceGui")
+        if surfaceGui then
+            local frame = surfaceGui:FindFirstChild(uiFrameName)
+            local btn = frame and frame:FindFirstChild("Btn")
+            local txt = btn and btn:FindFirstChild("Txt")
+            if txt then
+                local price = parseShortenedNumber(txt.Text)
+                if price > 0 then
+                    return price
+                end
+            end
+        end
+    end
+    
+    local floorIndex = tonumber(floorId:match("%d+")) or 1
+    local floorData = Configuration and Configuration.FloorConfig and Configuration.FloorConfig[floorIndex]
+    if floorData then
+        local base = 80
+        local growth = Configuration.ExtraPowerGrowth or 1.35
+        
+        if remoteUpgradeName:find("Yield") then
+            base = floorData.BaseExtraYieldUpgradeCost or 80
+        elseif remoteUpgradeName:find("Power") then
+            base = floorData.BaseExtraPowerUpgradeCost or 80
+        elseif remoteUpgradeName:find("SawRange") or remoteUpgradeName:find("Range") then
+            local costs = floorData.ExtraSawRangeCosts
+            return costs and costs[currentLevel + 1] or 0
+        elseif remoteUpgradeName:find("SprinklerRange") then
+            local costs = floorData.ExtraSprinklerRangeCosts
+            return costs and costs[currentLevel + 1] or 0
+        end
+        
+        return math.floor(base * (growth ^ (currentLevel or 0)))
+    end
+    
+    return 0
+end
+
 local MainTab = Window:CreateTab("Main", 4483362458)
 MainTab:CreateSection("Automation")
 
@@ -231,12 +333,10 @@ MainTab:CreateToggle({
                                                 isLocked = child:FindFirstChild("Lock") ~= nil or (dirt.Transparency > 0.1)
                                             end
                                         end
-                                        warn(string.format("[Alpha Hub Debug] Plot: %s, isLocked: %s", child.Name, tostring(isLocked)))
                                         if isLocked then
                                             local plotKey = child:GetAttribute("PlotKey") or tonumber(child.Name:match("%d+")) or 1
                                             local ring = math.floor((plotKey - 1) / 10) + 1
                                             local farmPlotStage = farmPlot:GetAttribute("FarmPlotStage") or farmPlot:GetAttribute("Stage") or myPlot:GetAttribute("FarmPlotStage_Floor1") or myPlot:GetAttribute("Stage_Floor1") or farmPlot:GetAttribute("FarmPlotStage_Floor1") or 1
-                                            warn(string.format("[Alpha Hub Debug] PlotKey: %s, Ring: %d, Stage: %s, ring <= stage: %s", tostring(plotKey), ring, tostring(farmPlotStage), tostring(ring <= farmPlotStage)))
                                             if ring <= farmPlotStage then
                                                 local cost = nil
                                                 local rawCost = child:GetAttribute("Cost") or child:GetAttribute("Price") or child:GetAttribute("UnlockCost") or dirt:GetAttribute("Cost") or dirt:GetAttribute("Price") or dirt:GetAttribute("UnlockCost")
@@ -270,7 +370,6 @@ MainTab:CreateToggle({
                                                         cost = 0
                                                     end
                                                 end
-                                                warn(string.format("[Alpha Hub Debug] Cost: %s, Cash: %s", tostring(cost), tostring(currentMoney)))
                                                 if cost and cost > 0 and currentMoney >= cost then
                                                     pcall(function()
                                                         unlockPlot:FireServer(dirt)
@@ -832,107 +931,6 @@ MainTab:CreateDropdown({
     end,
 })
 
-local function getSlotCrop(slot)
-    for _, child in ipairs(slot:GetChildren()) do
-        if child:IsA("Model") and child.Name ~= "Lock" and child.Name ~= "Dirt" then
-            return child
-        end
-    end
-    local dirt = slot:FindFirstChild("Dirt")
-    if dirt then
-        for _, child in ipairs(dirt:GetChildren()) do
-            if child:IsA("Model") then
-                return child
-            end
-        end
-    end
-    return nil
-end
-
-local function isCropGrown(crop)
-    if not crop then return false end
-    if crop:GetAttribute("Grown") == true or crop:GetAttribute("IsGrown") == true or crop:GetAttribute("Harvestable") == true then
-        return true
-    end
-    local stage = crop:GetAttribute("Stage")
-    local maxStage = crop:GetAttribute("MaxStage")
-    if stage and maxStage and stage >= maxStage then
-        return true
-    end
-    local progress = crop:GetAttribute("Progress")
-    if progress and progress >= 100 then
-        return true
-    end
-    local state = crop:GetAttribute("CropState") or crop:GetAttribute("State")
-    if state and (tostring(state):lower():find("grown") or tostring(state):lower():find("ready") or tostring(state):lower():find("harvest")) then
-        return true
-    end
-    return false
-end
-
-local function findFarmPlot(floorId)
-    if not myPlot then myPlot = findMyPlot() end
-    if not myPlot then return nil end
-    local targetName = "FarmPlot"
-    if floorId ~= "Floor1" then
-        targetName = "FarmPlot_" .. floorId
-    end
-    local fp = myPlot:FindFirstChild(targetName)
-    if fp then return fp end
-    fp = myPlot:FindFirstChild("FarmPlot" .. floorId)
-    if fp then return fp end
-    fp = myPlot:FindFirstChild("FarmPlot")
-    if fp then return fp end
-    for _, child in ipairs(myPlot:GetChildren()) do
-        local name = child.Name:lower()
-        if name:find("farmplot") and name:find(floorId:lower()) then
-            return child
-        end
-    end
-    return nil
-end
-
-local function getUpgradePrice(floorId, remoteUpgradeName, uiFrameName, currentLevel)
-    if myPlot then
-        local sign = myPlot:FindFirstChild("PlotUpgradeSign")
-        local screen = sign and sign:FindFirstChild("Screen")
-        local surfaceGui = screen and screen:FindFirstChild("SurfaceGui")
-        if surfaceGui then
-            local frame = surfaceGui:FindFirstChild(uiFrameName)
-            local btn = frame and frame:FindFirstChild("Btn")
-            local txt = btn and btn:FindFirstChild("Txt")
-            if txt then
-                local price = parseShortenedNumber(txt.Text)
-                if price > 0 then
-                    return price
-                end
-            end
-        end
-    end
-    
-    local floorIndex = tonumber(floorId:match("%d+")) or 1
-    local floorData = Configuration and Configuration.FloorConfig and Configuration.FloorConfig[floorIndex]
-    if floorData then
-        local base = 80
-        local growth = Configuration.ExtraPowerGrowth or 1.35
-        
-        if remoteUpgradeName:find("Yield") then
-            base = floorData.BaseExtraYieldUpgradeCost or 80
-        elseif remoteUpgradeName:find("Power") then
-            base = floorData.BaseExtraPowerUpgradeCost or 80
-        elseif remoteUpgradeName:find("SawRange") or remoteUpgradeName:find("Range") then
-            local costs = floorData.ExtraSawRangeCosts
-            return costs and costs[currentLevel + 1] or 0
-        elseif remoteUpgradeName:find("SprinklerRange") then
-            local costs = floorData.ExtraSprinklerRangeCosts
-            return costs and costs[currentLevel + 1] or 0
-        end
-        
-        return math.floor(base * (growth ^ (currentLevel or 0)))
-    end
-    
-    return 0
-end
 
 task.spawn(function()
     while _G.AlphaScriptExecutionId == currentExecId do
