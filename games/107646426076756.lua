@@ -40,22 +40,6 @@ local function parseShortenedNumber(str)
     return num * mult
 end
 
-local function getPrice(floor, upgrade)
-    if not myPlot then return -1 end
-    local floorObj = myPlot:FindFirstChild(floor)
-    if floorObj then
-        local sign = floorObj:FindFirstChild("PlotUpgradeSign")
-        if sign and sign:FindFirstChild("Screen") and sign.Screen:FindFirstChild("SurfaceGui") then
-            local upgradeFrame = sign.Screen.SurfaceGui:FindFirstChild(upgrade)
-            if upgradeFrame and upgradeFrame:FindFirstChild("Btn") and upgradeFrame.Btn:FindFirstChild("Txt") then
-                local priceText = upgradeFrame.Btn.Txt.Text
-                return parseShortenedNumber(priceText)
-            end
-        end
-    end
-    return -1
-end
-
 local function getMyMoney()
     local leaderstats = player:FindFirstChild("leaderstats")
     if leaderstats then
@@ -105,50 +89,64 @@ local activeToggles = {}
 local function addFloorSection(floorId, displayName)
     MainTab:CreateSection("Auto Upgrade (" .. displayName .. ")")
     
-    local upgradeOrder = {"ExtraYield", "ExtraSawRange", "ExtraPower", "ExtraSprinklerRange"}
+    if not myPlot then myPlot = findMyPlot() end
+    local floorObj = myPlot and myPlot:FindFirstChild(floorId)
+    local sign = floorObj and floorObj:FindFirstChild("PlotUpgradeSign")
+    local surfaceGui = sign and sign:FindFirstChild("Screen") and sign.Screen:FindFirstChild("SurfaceGui")
     
-    local internalNames = {
-        ExtraYield = "ExtraYield",
-        ExtraSawRange = "SawRange",
-        ExtraPower = "ExtraPower",
-        ExtraSprinklerRange = "ExtraSprinklerRange"
-    }
+    if not surfaceGui then return end
     
-    for _, upgradeName in ipairs(upgradeOrder) do
-        local toggleKey = floorId .. "_" .. upgradeName
-        activeToggles[toggleKey] = false
-        
-        local internalUiName = internalNames[upgradeName]
-        
-        MainTab:CreateToggle({
-            Name = "Auto " .. upgradeName .. " Upgrade",
-            CurrentValue = false,
-            Flag = "Flag_" .. toggleKey,
-            Callback = function(Value)
-                activeToggles[toggleKey] = Value
-                if Value then
-                    task.spawn(function()
-                        while activeToggles[toggleKey] and _G.AlphaScriptExecutionId == currentExecId do
-                            if not myPlot then myPlot = findMyPlot() end
-                            if myPlot then
-                                local price = getPrice(floorId, internalUiName)
-                                local currentMoney = getMyMoney()
-                                
-                                if price > 0 and currentMoney >= price then
-                                    local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
-                                    local remote = remotes and remotes:FindFirstChild("PlotUpgradeTransaction")
-                                    if remote then
-                                        remote:InvokeServer(upgradeName, floorId)
-                                        task.wait(2)
+    for _, child in ipairs(surfaceGui:GetChildren()) do
+        if child:IsA("GuiObject") and child:FindFirstChild("Btn") and child.Btn:FindFirstChild("Txt") then
+            local uiFrameName = child.Name
+            
+            local remoteUpgradeName = uiFrameName
+            if not remoteUpgradeName:find("^Extra") then
+                remoteUpgradeName = "Extra" .. remoteUpgradeName
+            end
+            
+            local toggleKey = floorId .. "_" .. remoteUpgradeName
+            activeToggles[toggleKey] = false
+            
+            MainTab:CreateToggle({
+                Name = "Auto " .. remoteUpgradeName .. " Upgrade",
+                CurrentValue = false,
+                Flag = "Flag_" .. toggleKey,
+                Callback = function(Value)
+                    activeToggles[toggleKey] = Value
+                    if Value then
+                        task.spawn(function()
+                            while activeToggles[toggleKey] and _G.AlphaScriptExecutionId == currentExecId do
+                                if not myPlot then myPlot = findMyPlot() end
+                                if myPlot then
+                                    local currentFloorObj = myPlot:FindFirstChild(floorId)
+                                    local currentSign = currentFloorObj and currentFloorObj:FindFirstChild("PlotUpgradeSign")
+                                    local currentGui = currentSign and currentSign:FindFirstChild("Screen") and currentSign.Screen:FindFirstChild("SurfaceGui")
+                                    local currentFrame = currentGui and currentGui:FindFirstChild(uiFrameName)
+                                    
+                                    if currentFrame and currentFrame:FindFirstChild("Btn") and currentFrame.Btn:FindFirstChild("Txt") then
+                                        local price = parseShortenedNumber(currentFrame.Btn.Txt.Text)
+                                        local currentMoney = getMyMoney()
+                                        
+                                        if price > 0 and currentMoney >= price then
+                                            local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+                                            local remote = remotes and remotes:FindFirstChild("PlotUpgradeTransaction")
+                                            if remote then
+                                                remote:InvokeServer(remoteUpgradeName, floorId)
+                                                task.wait(1.5)
+                                            end
+                                        else
+                                            warn("[AlphaHub Log] Warten für " .. remoteUpgradeName .. ". Preis im UI: " .. tostring(price) .. " | Dein Geld: " .. tostring(currentMoney))
+                                        end
                                     end
                                 end
+                                task.wait(1)
                             end
-                            task.wait(1)
-                        end
-                    end)
+                        end)
+                    end
                 end
-            end
-        })
+            end)
+        end
     end
 end
 
