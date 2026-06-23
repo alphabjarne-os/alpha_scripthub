@@ -31,17 +31,17 @@ local function parseShortenedNumber(str)
     local num = tonumber(numStr) or 0
     
     local multipliers = {
-        K = 1000, 
-        M = 1000000, 
-        B = 1000000000, 
-        T = 100000000000,
-        Q = 100000000000000, 
-        Qa = 100000000000000, 
-        Qi = 100000000000000000, 
-        Sx = 100000000000000000000,
-        Sp = 100000000000000000000000, 
-        Oc = 100000000000000000000000000, 
-        No = 100000000000000000000000000000
+        K = 10^3, 
+        M = 10^6, 
+        B = 10^9, 
+        T = 10^12,
+        Q = 10^15, 
+        Qa = 10^15, 
+        Qi = 10^18, 
+        Sx = 10^21,
+        Sp = 10^24, 
+        Oc = 10^27, 
+        No = 10^30
     }
     
     local mult = multipliers[suffix] or 1
@@ -124,7 +124,7 @@ local function addFloorSection(floorId, displayName)
                 local toggleKey = floorId .. "_" .. remoteUpgradeName
                 activeToggles[toggleKey] = false
                 
-                MainTab:CreateToggle({
+                MainTab:CreateToggle(
                     Name = "Auto " .. remoteUpgradeName .. " Upgrade",
                     CurrentValue = false,
                     Flag = "Flag_" .. toggleKey,
