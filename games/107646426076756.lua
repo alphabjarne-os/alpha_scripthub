@@ -20,7 +20,7 @@ myPlot = findMyPlot()
 local function parseShortenedNumber(str)
     if not str then return 0 end
     
-    local clean = str:gsub("[$,]", "")
+    local clean = str:gsub("[$,%s]", "")
     if clean:lower():find("max") then return -1 end
     
     local suffix = clean:match("%a+$")
@@ -72,8 +72,9 @@ local function getMyMoney()
             local val = moneyObj.Value
             if type(val) == "string" then
                 return parseShortenedNumber(val)
+            elseif type(val) == "number" then
+                return val
             end
-            return tonumber(val) or 0
         end
     end
     return 0
@@ -141,12 +142,14 @@ local function addFloorSection(floorId, displayName)
                                 local price = getPrice(floorId, upgradeName)
                                 local currentMoney = getMyMoney()
                                 
+                                warn(string.format("[AlphaHub Check] Floor: %s | Upgrade: %s | Berechneter Preis: %s | Berechnetes Geld: %s", tostring(floorId), tostring(upgradeName), tostring(price), tostring(currentMoney)))
+                                
                                 if price > 0 and currentMoney >= price then
                                     local remote = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes") 
                                         and game:GetService("ReplicatedStorage").Remotes:FindFirstChild("PlotUpgradeTransaction")
                                     if remote then
                                         remote:InvokeServer(upgradeName, floorId)
-                                        task.wait(1)
+                                        task.wait(1.5)
                                     end
                                 end
                             end
