@@ -1,4 +1,5 @@
 local Window = _G.AlphaWindow
+local currentExecId = _G.AlphaScriptExecutionId
 local player = game.Players.LocalPlayer
 local myPlot = nil
 
@@ -95,7 +96,7 @@ local AutoSell = MainTab:CreateToggle({
         
         if AutoSellEnabled then
             task.spawn(function()
-                while AutoSellEnabled do
+                while AutoSellEnabled and _G.AlphaScriptExecutionId == currentExecId do
                     if not myPlot then
                         myPlot = findMyPlot()
                     end
@@ -137,7 +138,7 @@ local function addFloorSection(floorId, displayName)
                 toggles[upgradeName] = Value
                 if Value then
                     task.spawn(function()
-                        while toggles[upgradeName] do
+                        while toggles[upgradeName] and _G.AlphaScriptExecutionId == currentExecId do
                             if not myPlot then myPlot = findMyPlot() end
                             if myPlot then
                                 local price = getPrice(floorId, upgradeName)

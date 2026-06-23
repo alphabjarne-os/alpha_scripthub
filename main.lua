@@ -10,6 +10,8 @@ if game:GetService("CoreGui"):FindFirstChild("Rayfield") then
     game:GetService("CoreGui").Rayfield:Destroy()
 end
 
+_G.AlphaScriptExecutionId = (_G.AlphaScriptExecutionId or 0) + 1
+
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local placeId = tostring(game.PlaceId)
 local baseUrl = "https://raw.githubusercontent.com/alphabjarne-os/alpha_scripthub/refs/heads/main/games/"
