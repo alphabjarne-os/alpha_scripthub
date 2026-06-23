@@ -261,7 +261,6 @@ rollConnection = RollSeedsEvent.OnClientEvent:Connect(function(arg1, arg2)
                                     prompt.MaxActivationDistance = 9e9
                                     prompt.RequiresLineOfSight = false
                                     prompt.HoldDuration = 0
-                                    -- test
                                     task.wait(0.1)
                                     fireproximityprompt(prompt)
                                 end)
