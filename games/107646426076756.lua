@@ -355,7 +355,6 @@ MainTab:CreateToggle({
                     task.wait(1)
                     continue 
                 end
-                
                 local activePlots = {}
                 local fp1 = findFarmPlot("Floor1")
                 if fp1 then
@@ -370,16 +369,21 @@ MainTab:CreateToggle({
                         end
                     end
                 end
-                
                 table.sort(activePlots, function(a, b)
                     return a.floorIndex < b.floorIndex
                 end)
-                
                 if #activePlots == 0 then
                     task.wait(1)
                     continue
                 end
-                
+                local globalUnlockedCount = 0
+                for _, plotData in ipairs(activePlots) do
+                    for _, child in ipairs(plotData.plot:GetChildren()) do
+                        if child:GetAttribute("Unlocked") == true then
+                            globalUnlockedCount = globalUnlockedCount + 1
+                        end
+                    end
+                end
                 local boughtSomething = false
                 for _, plotData in ipairs(activePlots) do
                     local farmPlot = plotData.plot
@@ -390,7 +394,6 @@ MainTab:CreateToggle({
                         local numB = tonumber(b.Name:match("%d+")) or 0
                         return numA < numB
                     end)
-                    
                     local farmPlotStage = farmPlot:GetAttribute("FarmPlotStage") or farmPlot:GetAttribute("Stage")
                     if not farmPlotStage then
                         if floorIndex == 1 then
@@ -400,13 +403,6 @@ MainTab:CreateToggle({
                         end
                     end
                     farmPlotStage = farmPlotStage or 1
-                    
-                    local totalUnlocked = 0
-                    for _, child in ipairs(children) do
-                        if child:GetAttribute("Unlocked") == true then
-                            totalUnlocked = totalUnlocked + 1
-                        end
-                    end
                     for _, child in ipairs(children) do
                         if not AutoUnlockGround or _G.AlphaScriptExecutionId ~= currentExecId then break end
                         local dirt = child:FindFirstChild("Dirt")
@@ -431,7 +427,7 @@ MainTab:CreateToggle({
                             local bases = floorData.PlotUnlockBase
                             local growth = floorData.PlotUnlockGrowth or 1.4
                             local base = bases and (bases[ring] or bases[#bases] or 25) or 25
-                            cost = base * (growth ^ totalUnlocked)
+                            cost = base * (growth ^ globalUnlockedCount)
                         end
                         if cost <= 0 then continue end
                         local rawMoney = getMyMoney()
