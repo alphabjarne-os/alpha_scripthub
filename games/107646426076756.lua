@@ -930,7 +930,7 @@ local function getUpgradePrice(floorId, remoteUpgradeName, uiFrameName, currentL
     return 0
 end
 
-local task.spawn(function()
+task.spawn(function()
     while _G.AlphaScriptExecutionId == currentExecId do
         myPlot = findMyPlot()
         if myPlot then break end
