@@ -187,6 +187,242 @@ MainTab:CreateButton({
     end,
 })
 
+MainTab:CreateSection("Plant Automation")
+
+local AutoUnlockGround = false
+MainTab:CreateToggle({
+    Name = "Auto Buy Ground",
+    CurrentValue = false,
+    Flag = "AlphaAutoBuyGround_Floor1",
+    Callback = function(Value)
+        AutoUnlockGround = Value
+        if AutoUnlockGround then
+            task.spawn(function()
+                while AutoUnlockGround and _G.AlphaScriptExecutionId == currentExecId do
+                    if not myPlot then myPlot = findMyPlot() end
+                    if myPlot then
+                        local currentMoney = getMyMoney()
+                        local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+                        local unlockPlot = remotes and remotes:FindFirstChild("UnlockPlot")
+                        if unlockPlot then
+                            local farmPlot = findFarmPlot("Floor1")
+                            if farmPlot then
+                                local children = farmPlot:GetChildren()
+                                table.sort(children, function(a, b)
+                                    local numA = tonumber(a.Name:match("%d+")) or 0
+                                    local numB = tonumber(b.Name:match("%d+")) or 0
+                                    return numA < numB
+                                end)
+                                for _, child in ipairs(children) do
+                                    local dirt = child:FindFirstChild("Dirt")
+                                    if dirt then
+                                        local isUnlocked = child:GetAttribute("Unlocked")
+                                        local isLocked
+                                        if isUnlocked ~= nil then
+                                            isLocked = not isUnlocked
+                                        else
+                                            isLocked = child:GetAttribute("Locked")
+                                            if isLocked == nil then
+                                                isLocked = child:GetAttribute("IsLocked")
+                                            end
+                                            if isLocked == nil then
+                                                isLocked = child:FindFirstChild("Lock") ~= nil or (dirt.Transparency > 0.1)
+                                            end
+                                        end
+                                        if isLocked then
+                                            local plotKey = child:GetAttribute("PlotKey") or tonumber(child.Name:match("%d+")) or 1
+                                            local ring = math.floor((plotKey - 1) / 10) + 1
+                                            local farmPlotStage = farmPlot:GetAttribute("FarmPlotStage") or farmPlot:GetAttribute("Stage") or myPlot:GetAttribute("FarmPlotStage_Floor1") or myPlot:GetAttribute("Stage_Floor1") or farmPlot:GetAttribute("FarmPlotStage_Floor1") or 1
+                                            if ring <= farmPlotStage then
+                                                local cost = nil
+                                                local rawCost = child:GetAttribute("Cost") or child:GetAttribute("Price") or child:GetAttribute("UnlockCost") or dirt:GetAttribute("Cost") or dirt:GetAttribute("Price") or dirt:GetAttribute("UnlockCost")
+                                                if type(rawCost) == "number" then
+                                                    cost = rawCost
+                                                elseif type(rawCost) == "string" then
+                                                    cost = parseShortenedNumber(rawCost)
+                                                end
+                                                if not cost or cost <= 0 then
+                                                    local lock = child:FindFirstChild("Lock")
+                                                    if lock then
+                                                        local textLabel = lock:FindFirstChildWhichIsA("TextLabel", true)
+                                                        if textLabel then
+                                                            local parsed = parseShortenedNumber(textLabel.Text)
+                                                            if parsed > 0 then
+                                                                cost = parsed
+                                                            end
+                                                        end
+                                                    end
+                                                end
+                                                if not cost or cost <= 0 then
+                                                    local floorIndex = 1
+                                                    local floorData = Configuration and Configuration.FloorConfig and Configuration.FloorConfig[floorIndex]
+                                                    if floorData then
+                                                        local bases = floorData.PlotUnlockBase
+                                                        local growth = floorData.PlotUnlockGrowth or 1.4
+                                                        local idx = plotKey
+                                                        local base = bases and (bases[farmPlotStage] or bases[#bases] or 25) or 25
+                                                        cost = base * (growth ^ (idx - 1))
+                                                    else
+                                                        cost = 0
+                                                    end
+                                                end
+                                                print(string.format("[Alpha Hub] Ground check - Name: %s, PlotKey: %s, Ring: %d, Stage: %d, Cost: %s, Cash: %s", child.Name, tostring(plotKey), ring, farmPlotStage, tostring(cost), tostring(currentMoney)))
+                                                if cost and cost > 0 and currentMoney >= cost then
+                                                    pcall(function()
+                                                        unlockPlot:FireServer(dirt)
+                                                    end)
+                                                    currentMoney = currentMoney - cost
+                                                    task.wait(0.1)
+                                                end
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    task.wait(1)
+                end
+            end)
+        end
+    end,
+})
+
+local AutoPlantBest = false
+MainTab:CreateToggle({
+    Name = "Auto Plant Best",
+    CurrentValue = false,
+    Flag = "AlphaAutoPlantBest_Floor1",
+    Callback = function(Value)
+        AutoPlantBest = Value
+        if AutoPlantBest then
+            task.spawn(function()
+                while AutoPlantBest and _G.AlphaScriptExecutionId == currentExecId do
+                    if not myPlot then myPlot = findMyPlot() end
+                    if myPlot then
+                        local farmPlot = findFarmPlot("Floor1")
+                        if farmPlot then
+                            local children = farmPlot:GetChildren()
+                            local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+                            local plantSeed = remotes and remotes:FindFirstChild("PlantSeed")
+                            local removePlant = remotes and remotes:FindFirstChild("RemovePlant")
+                            local equipTool = remotes and remotes:FindFirstChild("EquipTool")
+                            if plantSeed and removePlant then
+                                local lastTargetDirt = nil
+                                local targetAttempts = 0
+                                while AutoPlantBest and _G.AlphaScriptExecutionId == currentExecId do
+                                    local bestTool = nil
+                                    local bestCost = -1
+                                    local toolsToSearch = {}
+                                    for _, t in ipairs(player.Backpack:GetChildren()) do
+                                        table.insert(toolsToSearch, t)
+                                    end
+                                    for _, t in ipairs(player.Character:GetChildren()) do
+                                        table.insert(toolsToSearch, t)
+                                    end
+                                    for _, tool in ipairs(toolsToSearch) do
+                                        if tool:IsA("Tool") and tool:GetAttribute("InventoryCategory") == "Seeds" then
+                                            local plantName = tool:GetAttribute("Plant")
+                                            local plantData = PlantsConfig[plantName]
+                                            local cost = plantData and plantData.Cost or 0
+                                            if cost > bestCost then
+                                                bestCost = cost
+                                                bestTool = tool
+                                            end
+                                        end
+                                    end
+                                    if not bestTool then
+                                        break
+                                    end
+                                    local slots = {}
+                                    for _, slot in ipairs(children) do
+                                        local dirt = slot:FindFirstChild("Dirt")
+                                        local isUnlocked = slot:GetAttribute("Unlocked") == true
+                                        if dirt and isUnlocked then
+                                            local crop = getSlotCrop(slot)
+                                            local cropName = crop and (crop:GetAttribute("Plant") or crop.Name) or nil
+                                            local plantData = cropName and PlantsConfig[cropName]
+                                            local cropCost = plantData and plantData.Cost or 0
+                                            local isGrown = crop and isCropGrown(crop) or false
+                                            table.insert(slots, {
+                                                dirt = dirt,
+                                                crop = crop,
+                                                cropCost = cropCost,
+                                                isGrown = isGrown
+                                            })
+                                        end
+                                    end
+                                    table.sort(slots, function(a, b)
+                                        local prioA = (not a.crop or a.isGrown) and 1 or 2
+                                        local prioB = (not b.crop or b.isGrown) and 1 or 2
+                                        if prioA ~= prioB then
+                                            return prioA < prioB
+                                        end
+                                        return a.cropCost < b.cropCost
+                                    end)
+                                    local target = slots[1]
+                                    if not target then
+                                        break
+                                    end
+                                    if target.dirt == lastTargetDirt then
+                                        targetAttempts = targetAttempts + 1
+                                        if targetAttempts > 5 then
+                                            task.wait(0.1)
+                                            if targetAttempts > 10 then
+                                                break
+                                            end
+                                        end
+                                    else
+                                        lastTargetDirt = target.dirt
+                                        targetAttempts = 1
+                                    end
+                                    if not target.crop or target.isGrown then
+                                        if target.isGrown then
+                                            pcall(function()
+                                                removePlant:FireServer(target.dirt)
+                                            end)
+                                            task.wait(0.02)
+                                        end
+                                        if bestTool.Parent ~= player.Character and equipTool then
+                                            pcall(function()
+                                                equipTool:FireServer(bestTool)
+                                            end)
+                                            task.wait(0.02)
+                                        end
+                                        pcall(function()
+                                            plantSeed:FireServer(target.dirt)
+                                        end)
+                                        task.wait(0.02)
+                                    else
+                                        if bestCost > target.cropCost then
+                                            pcall(function()
+                                                removePlant:FireServer(target.dirt)
+                                            end)
+                                            task.wait(0.02)
+                                            if bestTool.Parent ~= player.Character and equipTool then
+                                                pcall(function()
+                                                    equipTool:FireServer(bestTool)
+                                                end)
+                                                task.wait(0.02)
+                                            end
+                                            pcall(function()
+                                                plantSeed:FireServer(target.dirt)
+                                            end)
+                                            task.wait(0.02)
+                                        else
+                                            break
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    task.wait(0.2)
+                end
+            end)
+        end
+    end,
+})
 
 MainTab:CreateSection("Auto Upgrades")
 
@@ -694,353 +930,102 @@ local function getUpgradePrice(floorId, remoteUpgradeName, uiFrameName, currentL
     return 0
 end
 
-local function addFloorSection(floorId, displayName)
-    task.spawn(function()
-        while _G.AlphaScriptExecutionId == currentExecId do
-            myPlot = findMyPlot()
-            if myPlot then break end
-            task.wait(0.5)
-        end
-        
-        if _G.AlphaScriptExecutionId ~= currentExecId or not myPlot then return end
-        
-        local sign = myPlot:WaitForChild("PlotUpgradeSign", 10)
-        local screen = sign and sign:WaitForChild("Screen", 10)
-        local surfaceGui = screen and screen:WaitForChild("SurfaceGui", 10)
-        
-        if not surfaceGui then return end
-        
-        local FloorTab = Window:CreateTab(displayName, 4483362458)
-        MainTab:CreateSection(displayName .. " Automation")
-        
-        local AutoUnlockGround = false
-        MainTab:CreateToggle({
-            Name = "Auto Buy Ground",
-            CurrentValue = false,
-            Flag = "AlphaAutoBuyGround_" .. floorId,
-            Callback = function(Value)
-                AutoUnlockGround = Value
-                if AutoUnlockGround then
-                    task.spawn(function()
-                        while AutoUnlockGround and _G.AlphaScriptExecutionId == currentExecId do
-                            if not myPlot then myPlot = findMyPlot() end
-                            if myPlot then
-                                local currentMoney = getMyMoney()
-                                local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
-                                local unlockPlot = remotes and remotes:FindFirstChild("UnlockPlot")
-                                if unlockPlot then
-                                    local farmPlot = findFarmPlot(floorId)
-                                    if farmPlot then
-                                        local children = farmPlot:GetChildren()
-                                        table.sort(children, function(a, b)
-                                            local numA = tonumber(a.Name:match("%d+")) or 0
-                                            local numB = tonumber(b.Name:match("%d+")) or 0
-                                            return numA < numB
-                                        end)
-                                        for _, child in ipairs(children) do
-                                            local dirt = child:FindFirstChild("Dirt")
-                                            if dirt then
-                                                local isUnlocked = child:GetAttribute("Unlocked")
-                                                local isLocked
-                                                if isUnlocked ~= nil then
-                                                    isLocked = not isUnlocked
-                                                else
-                                                    isLocked = child:GetAttribute("Locked")
-                                                    if isLocked == nil then
-                                                        isLocked = child:GetAttribute("IsLocked")
-                                                    end
-                                                    if isLocked == nil then
-                                                        isLocked = child:FindFirstChild("Lock") ~= nil or (dirt.Transparency > 0.1)
-                                                    end
-                                                end
-                                                if isLocked then
-                                                    local plotKey = child:GetAttribute("PlotKey") or tonumber(child.Name:match("%d+")) or 1
-                                                    local ring = math.floor((plotKey - 1) / 10) + 1
-                                                    local stageAttr = "FarmPlotStage_" .. floorId
-                                                    local farmPlotStage = farmPlot:GetAttribute("FarmPlotStage") or farmPlot:GetAttribute("Stage") or myPlot:GetAttribute(stageAttr) or myPlot:GetAttribute("Stage_" .. floorId) or farmPlot:GetAttribute(stageAttr) or 1
-                                                    if ring <= farmPlotStage then
-                                                        local cost = nil
-                                                        local rawCost = child:GetAttribute("Cost") or child:GetAttribute("Price") or child:GetAttribute("UnlockCost") or dirt:GetAttribute("Cost") or dirt:GetAttribute("Price") or dirt:GetAttribute("UnlockCost")
-                                                        if type(rawCost) == "number" then
-                                                            cost = rawCost
-                                                        elseif type(rawCost) == "string" then
-                                                            cost = parseShortenedNumber(rawCost)
-                                                        end
-                                                        if not cost or cost <= 0 then
-                                                            local lock = child:FindFirstChild("Lock")
-                                                            if lock then
-                                                                local textLabel = lock:FindFirstChildWhichIsA("TextLabel", true)
-                                                                if textLabel then
-                                                                    local parsed = parseShortenedNumber(textLabel.Text)
-                                                                    if parsed > 0 then
-                                                                        cost = parsed
-                                                                    end
-                                                                end
-                                                            end
-                                                        end
-                                                        if not cost or cost <= 0 then
-                                                            local floorIndex = tonumber(floorId:match("%d+")) or 1
-                                                            local floorData = Configuration and Configuration.FloorConfig and Configuration.FloorConfig[floorIndex]
-                                                            if floorData then
-                                                                local bases = floorData.PlotUnlockBase
-                                                                local growth = floorData.PlotUnlockGrowth or 1.4
-                                                                local idx = plotKey
-                                                                local base = bases and (bases[farmPlotStage] or bases[#bases] or 25) or 25
-                                                                cost = base * (growth ^ (idx - 1))
-                                                            else
-                                                                cost = 0
-                                                            end
-                                                        end
-                                                        print(string.format("[Alpha Hub] Ground check - Name: %s, PlotKey: %s, Ring: %d, Stage: %d, Cost: %s, Cash: %s", child.Name, tostring(plotKey), ring, farmPlotStage, tostring(cost), tostring(currentMoney)))
-                                                        if cost and cost > 0 and currentMoney >= cost then
-                                                            pcall(function()
-                                                                unlockPlot:FireServer(dirt)
-                                                            end)
-                                                            currentMoney = currentMoney - cost
-                                                            task.wait(0.1)
-                                                        end
-                                                    end
-                                                end
-                                            end
-                                        end
-                                    end
-                                end
-                            end
-                            task.wait(1)
-                        end
-                    end)
+local task.spawn(function()
+    while _G.AlphaScriptExecutionId == currentExecId do
+        myPlot = findMyPlot()
+        if myPlot then break end
+        task.wait(0.5)
+    end
+    if _G.AlphaScriptExecutionId ~= currentExecId or not myPlot then return end
+    
+    local sign = myPlot:WaitForChild("PlotUpgradeSign", 10)
+    local screen = sign and sign:WaitForChild("Screen", 10)
+    local surfaceGui = screen and screen:WaitForChild("SurfaceGui", 10)
+    if not surfaceGui then return end
+    
+    local FloorTab = Window:CreateTab("Floor 1", 4483362458)
+    FloorTab:CreateSection("Auto Upgrades")
+    
+    for _, child in ipairs(surfaceGui:GetChildren()) do
+        if child:IsA("GuiObject") then
+            local btn = child:FindFirstChild("Btn")
+            local txt = btn and btn:FindFirstChild("Txt")
+            if txt then
+                local uiFrameName = child.Name
+                local remoteUpgradeName = uiFrameName
+                if remoteUpgradeName:find("Yield") then
+                    remoteUpgradeName = "ExtraYield"
+                elseif remoteUpgradeName:find("Power") then
+                    remoteUpgradeName = "ExtraPower"
+                elseif not remoteUpgradeName:find("^Extra") then
+                    remoteUpgradeName = "Extra" .. remoteUpgradeName
                 end
-            end,
-        })
-        
-        local AutoPlantBest = false
-        MainTab:CreateToggle({
-            Name = "Auto Plant Best",
-            CurrentValue = false,
-            Flag = "AlphaAutoPlantBest_" .. floorId,
-            Callback = function(Value)
-                AutoPlantBest = Value
-                if AutoPlantBest then
-                    task.spawn(function()
-                        while AutoPlantBest and _G.AlphaScriptExecutionId == currentExecId do
-                            if not myPlot then myPlot = findMyPlot() end
-                            if myPlot then
-                                local farmPlot = findFarmPlot(floorId)
-                                if farmPlot then
-                                    local children = farmPlot:GetChildren()
-                                    local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
-                                    local plantSeed = remotes and remotes:FindFirstChild("PlantSeed")
-                                    local removePlant = remotes and remotes:FindFirstChild("RemovePlant")
-                                    local equipTool = remotes and remotes:FindFirstChild("EquipTool")
-                                    if plantSeed and removePlant then
-                                        local lastTargetDirt = nil
-                                        local targetAttempts = 0
-                                        while AutoPlantBest and _G.AlphaScriptExecutionId == currentExecId do
-                                            local bestTool = nil
-                                            local bestCost = -1
-                                            local toolsToSearch = {}
-                                            for _, t in ipairs(player.Backpack:GetChildren()) do
-                                                table.insert(toolsToSearch, t)
+                
+                local titleObj = child:FindFirstChild("Title")
+                local cleanDisplayName = ""
+                if titleObj and titleObj:IsA("TextLabel") and titleObj.Text ~= "" then
+                    cleanDisplayName = "Auto Upgrade " .. titleObj.Text
+                else
+                    local baseName = remoteUpgradeName:gsub("^Extra", "")
+                    baseName = baseName:gsub("(%u)", " %1"):gsub("^%s+", "")
+                    cleanDisplayName = "Auto Upgrade " .. baseName
+                end
+                
+                local toggleKey = "Floor1_" .. remoteUpgradeName
+                local autoUpgradeActive = false
+                FloorTab:CreateToggle({
+                    Name = cleanDisplayName,
+                    CurrentValue = false,
+                    Flag = "Flag_" .. toggleKey,
+                    Callback = function(Value)
+                        autoUpgradeActive = Value
+                        if autoUpgradeActive then
+                            task.spawn(function()
+                                while autoUpgradeActive and _G.AlphaScriptExecutionId == currentExecId do
+                                    if not myPlot then myPlot = findMyPlot() end
+                                    if myPlot then
+                                        local currentMoney = getMyMoney()
+                                        local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+                                        local remote = remotes and remotes:FindFirstChild("PlotUpgradeTransaction")
+                                        if remote then
+                                            local currentLevel = 0
+                                            local searchPattern = ""
+                                            if remoteUpgradeName:find("Yield") then
+                                                searchPattern = "Yield"
+                                            elseif remoteUpgradeName:find("Power") then
+                                                searchPattern = "Power"
+                                            elseif remoteUpgradeName:find("SawRange") or remoteUpgradeName:find("Range") then
+                                                searchPattern = "SawRange"
+                                            elseif remoteUpgradeName:find("SprinklerRange") then
+                                                searchPattern = "SprinklerRange"
                                             end
-                                            for _, t in ipairs(player.Character:GetChildren()) do
-                                                table.insert(toolsToSearch, t)
-                                            end
-                                            for _, tool in ipairs(toolsToSearch) do
-                                                if tool:IsA("Tool") and tool:GetAttribute("InventoryCategory") == "Seeds" then
-                                                    local plantName = tool:GetAttribute("Plant")
-                                                    local plantData = PlantsConfig[plantName]
-                                                    local cost = plantData and plantData.Cost or 0
-                                                    if cost > bestCost then
-                                                        bestCost = cost
-                                                        bestTool = tool
-                                                    end
-                                                end
-                                            end
-                                            if not bestTool then
-                                                break
-                                            end
-                                            local slots = {}
-                                            for _, slot in ipairs(children) do
-                                                local dirt = slot:FindFirstChild("Dirt")
-                                                local isUnlocked = slot:GetAttribute("Unlocked") == true
-                                                if dirt and isUnlocked then
-                                                    local crop = getSlotCrop(slot)
-                                                    local cropName = crop and (crop:GetAttribute("Plant") or crop.Name) or nil
-                                                    local plantData = cropName and PlantsConfig[cropName]
-                                                    local cropCost = plantData and plantData.Cost or 0
-                                                    local isGrown = crop and isCropGrown(crop) or false
-                                                    table.insert(slots, {
-                                                        dirt = dirt,
-                                                        crop = crop,
-                                                        cropCost = cropCost,
-                                                        isGrown = isGrown
-                                                    })
-                                                end
-                                            end
-                                            table.sort(slots, function(a, b)
-                                                local prioA = (not a.crop or a.isGrown) and 1 or 2
-                                                local prioB = (not b.crop or b.isGrown) and 1 or 2
-                                                if prioA ~= prioB then
-                                                    return prioA < prioB
-                                                end
-                                                return a.cropCost < b.cropCost
-                                            end)
-                                            local target = slots[1]
-                                            if not target then
-                                                break
-                                            end
-                                            if target.dirt == lastTargetDirt then
-                                                targetAttempts = targetAttempts + 1
-                                                if targetAttempts > 5 then
-                                                    task.wait(0.1)
-                                                    if targetAttempts > 10 then
+                                            if searchPattern ~= "" then
+                                                for attrName, val in pairs(myPlot:GetAttributes()) do
+                                                    if attrName:lower():find(searchPattern:lower()) and attrName:lower():find("floor1") then
+                                                        currentLevel = val
                                                         break
                                                     end
                                                 end
-                                            else
-                                                lastTargetDirt = target.dirt
-                                                targetAttempts = 1
                                             end
-                                            if not target.crop or target.isGrown then
-                                                if target.isGrown then
-                                                    pcall(function()
-                                                        removePlant:FireServer(target.dirt)
-                                                    end)
-                                                    task.wait(0.02)
-                                                end
-                                                if bestTool.Parent ~= player.Character and equipTool then
-                                                    pcall(function()
-                                                        equipTool:FireServer(bestTool)
-                                                    end)
-                                                    task.wait(0.02)
-                                                end
-                                                pcall(function()
-                                                    plantSeed:FireServer(target.dirt)
+                                            local price = getUpgradePrice("Floor1", remoteUpgradeName, uiFrameName, currentLevel)
+                                            if price > 0 and currentMoney >= price then
+                                                local success, err = pcall(function()
+                                                    remote:InvokeServer(remoteUpgradeName, "Floor1")
                                                 end)
-                                                task.wait(0.02)
-                                            else
-                                                if bestCost > target.cropCost then
-                                                    pcall(function()
-                                                        removePlant:FireServer(target.dirt)
-                                                    end)
-                                                    task.wait(0.02)
-                                                    if bestTool.Parent ~= player.Character and equipTool then
-                                                        pcall(function()
-                                                            equipTool:FireServer(bestTool)
-                                                        end)
-                                                        task.wait(0.02)
-                                                    end
-                                                    pcall(function()
-                                                        plantSeed:FireServer(target.dirt)
-                                                    end)
-                                                    task.wait(0.02)
-                                                else
-                                                    break
+                                                if success then
+                                                    currentMoney = currentMoney - price
+                                                    task.wait(0.1)
                                                 end
                                             end
                                         end
                                     end
+                                    task.wait(0.5)
                                 end
-                            end
-                            task.wait(0.2)
+                            end)
                         end
-                    end)
-                end
-            end,
-        })
-        
-        task.wait(0.5)
-        
-        FloorTab:CreateSection("Auto Upgrades")
-        
-        for _, child in ipairs(surfaceGui:GetChildren()) do
-            if child:IsA("GuiObject") then
-                local btn = child:FindFirstChild("Btn")
-                local txt = btn and btn:FindFirstChild("Txt")
-                
-                if txt then
-                    local uiFrameName = child.Name
-                    local remoteUpgradeName = uiFrameName
-                    if remoteUpgradeName:find("Yield") then
-                        remoteUpgradeName = "ExtraYield"
-                    elseif remoteUpgradeName:find("Power") then
-                        remoteUpgradeName = "ExtraPower"
-                    elseif not remoteUpgradeName:find("^Extra") then
-                        remoteUpgradeName = "Extra" .. remoteUpgradeName
                     end
-                    
-                    local titleObj = child:FindFirstChild("Title")
-                    local cleanDisplayName = ""
-                    
-                    if titleObj and titleObj:IsA("TextLabel") and titleObj.Text ~= "" then
-                        cleanDisplayName = "Auto Upgrade " .. titleObj.Text
-                    else
-                        local baseName = remoteUpgradeName:gsub("^Extra", "")
-                        baseName = baseName:gsub("(%u)", " %1"):gsub("^%s+", "")
-                        cleanDisplayName = "Auto Upgrade " .. baseName
-                    end
-                    
-                    local toggleKey = floorId .. "_" .. remoteUpgradeName
-                    
-                    local autoUpgradeActive = false
-                    FloorTab:CreateToggle({
-                        Name = cleanDisplayName,
-                        CurrentValue = false,
-                        Flag = "Flag_" .. toggleKey,
-                        Callback = function(Value)
-                            autoUpgradeActive = Value
-                            if autoUpgradeActive then
-                                task.spawn(function()
-                                    while autoUpgradeActive and _G.AlphaScriptExecutionId == currentExecId do
-                                        if not myPlot then myPlot = findMyPlot() end
-                                        if myPlot then
-                                            local currentMoney = getMyMoney()
-                                            local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
-                                            local remote = remotes and remotes:FindFirstChild("PlotUpgradeTransaction")
-                                            if remote then
-                                                local currentLevel = 0
-                                                local searchPattern = ""
-                                                if remoteUpgradeName:find("Yield") then
-                                                    searchPattern = "Yield"
-                                                elseif remoteUpgradeName:find("Power") then
-                                                    searchPattern = "Power"
-                                                elseif remoteUpgradeName:find("SawRange") or remoteUpgradeName:find("Range") then
-                                                    searchPattern = "SawRange"
-                                                elseif remoteUpgradeName:find("SprinklerRange") then
-                                                    searchPattern = "SprinklerRange"
-                                                end
-                                                
-                                                if searchPattern ~= "" then
-                                                    for attrName, val in pairs(myPlot:GetAttributes()) do
-                                                        if attrName:lower():find(searchPattern:lower()) and attrName:lower():find(floorId:lower()) then
-                                                            currentLevel = val
-                                                            break
-                                                        end
-                                                    end
-                                                end
-                                                
-                                                local price = getUpgradePrice(floorId, remoteUpgradeName, uiFrameName, currentLevel)
-                                                if price > 0 and currentMoney >= price then
-                                                    local success, err = pcall(function()
-                                                        remote:InvokeServer(remoteUpgradeName, floorId)
-                                                    end)
-                                                    if success then
-                                                        currentMoney = currentMoney - price
-                                                        task.wait(0.1)
-                                                    end
-                                                end
-                                            end
-                                        end
-                                        task.wait(0.5)
-                                    end
-                                end)
-                            end
-                        end
-                    })
-                end
+                end)
             end
         end
-    end)
-end
-
-addFloorSection("Floor1", "Floor 1")
+    end
+end)
