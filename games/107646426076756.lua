@@ -352,6 +352,12 @@ MainTab:CreateToggle({
                     return numA < numB
                 end)
                 local farmPlotStage = farmPlot:GetAttribute("FarmPlotStage") or farmPlot:GetAttribute("Stage") or myPlot:GetAttribute("FarmPlotStage_Floor1") or myPlot:GetAttribute("Stage_Floor1") or 1
+                local totalUnlocked = 0
+                for _, child in ipairs(children) do
+                    if child:GetAttribute("Unlocked") == true then
+                        totalUnlocked = totalUnlocked + 1
+                    end
+                end
                 for _, child in ipairs(children) do
                     if not AutoUnlockGround or _G.AlphaScriptExecutionId ~= currentExecId then break end
                     local dirt = child:FindFirstChild("Dirt")
@@ -360,31 +366,33 @@ MainTab:CreateToggle({
                     local isLocked
                     if isUnlocked ~= nil then
                         isLocked = not isUnlocked
-                    end
-                    if not isLocked then continue end
-                    local plotKey = child:GetAttribute("PlotKey") or tonumber(child.Name:match("%d+")) or 1
-                    local ring = math.floor((plotKey - 1) / 10) + 1
-                    if ring > farmPlotStage then continue end
-                    local cost = nil
-                    if not cost or cost <= 0 then
-                        local floorData = Configuration and Configuration.FloorConfig and Configuration.FloorConfig[1]
-                        if floorData then
-                            local bases = floorData.PlotUnlockBase
-                            local growth = floorData.PlotUnlockGrowth or 1.4
-                            local base = bases and (bases[farmPlotStage] or bases[#bases] or 25) or 25
-                            warn(bases,base,growth)
-                            cost = base * (growth ^ (plotKey - 1))
-                            warn(cost)
+                    else
+                        isLocked = child:GetAttribute("Locked")
+                        if isLocked == nil then isLocked = child:GetAttribute("IsLocked") end
+                        if isLocked == nil then 
+                            isLocked = child:FindFirstChild("Lock") ~= nil or (dirt.Transparency > 0.1) 
                         end
                     end
-                    if not cost or cost <= 0 then continue end
+                    if not isLocked then continue end
+                    local ring = tonumber(child.Name:match("%d+")) or 1
+                    if ring > farmPlotStage then continue end
+                    local cost = 0
+                    local floorData = Configuration and Configuration.FloorConfig and Configuration.FloorConfig[1]
+                    if floorData then
+                        local bases = floorData.PlotUnlockBase
+                        local growth = floorData.PlotUnlockGrowth or 1.4
+                        local base = bases and (bases[ring] or bases[#bases] or 25) or 25
+                        cost = base * (growth ^ totalUnlocked)
+                    end
+                    if cost <= 0 then continue end
                     local rawMoney = getMyMoney()
-                    warn(rawMoney,cost)
-                    if rawMoney >= cost then
+                    local currentMoney = type(rawMoney) == "number" and rawMoney or parseShortenedNumber(tostring(rawMoney)) or 0
+                    if currentMoney >= cost then
                         pcall(function()
                             unlockPlotRemote:FireServer(dirt)
                         end)
                         task.wait(0.1)
+                        break
                     end
                 end
                 task.wait(1)
