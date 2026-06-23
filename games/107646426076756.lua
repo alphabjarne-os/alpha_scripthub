@@ -4,7 +4,6 @@ local player = game.Players.LocalPlayer
 local myPlot = nil
 local AntiAFKEnabled = false
 
--- test
 
 local virtualUser = game:GetService("VirtualUser")
 player.Idled:Connect(function()
@@ -238,13 +237,47 @@ rollConnection = RollSeedsEvent.OnClientEvent:Connect(function(arg1, arg2)
         isProcessingRoll = true
         currentRollId = rollId
         lastSlotsData = slots
-        pcall(function()
-            RollAnimationDoneEvent:FireServer(rollId)
-        end)
         
         pcall(function()
-            if slots then
+            task.wait(0.05)
+            local prompt = nil
+            if not myPlot then myPlot = findMyPlot() end
+            local roller = myPlot and myPlot:FindFirstChild("SeedRoller")
+            if roller then
+                prompt = roller:FindFirstChildWhichIsA("ProximityPrompt", true)
+            end
+            
+            local isSkipped = true
+            if prompt then
+                if not prompt.Enabled then
+                    isSkipped = false
+                    local completed = false
+                    local conn
+                    conn = prompt:GetPropertyChangedSignal("Enabled"):Connect(function()
+                        if prompt.Enabled then
+                            completed = true
+                            if conn then conn:Disconnect() end
+                        end
+                    end)
+                    local start = tick()
+                    while not completed and tick() - start < 3 do
+                        task.wait(0.05)
+                    end
+                    if conn then conn:Disconnect() end
+                end
+            else
                 task.wait(1.5)
+            end
+            
+            pcall(function()
+                RollAnimationDoneEvent:FireServer(rollId)
+            end)
+            
+            if not isSkipped then
+                task.wait(0.2)
+            end
+            
+            if slots then
                 local currentMoney = getMyMoney()
                 for slotIndex, slot in ipairs(slots) do
                     local seedName = slot.Seed
