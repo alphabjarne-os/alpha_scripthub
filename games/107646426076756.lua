@@ -127,6 +127,7 @@ local RollAnimationDoneEvent = game:GetService("ReplicatedStorage"):WaitForChild
 local BuySeedEvent = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("BuySeed", 5)
 local RaritiesConfig = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Registry"):WaitForChild("Rarities"))
 local PlantsConfig = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Registry"):WaitForChild("Plants"))
+local Configuration = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Configuration"))
 
 local AutoRollEnabled = false
 local currentRollId = nil
@@ -409,6 +410,144 @@ MainTab:CreateDropdown({
 
 local activeToggles = {}
 local registeredUpgrades = {}
+local AutoUnlockGroundToggles = {}
+
+local function findFarmPlot(floorId)
+    if not myPlot then myPlot = findMyPlot() end
+    if not myPlot then return nil end
+    local targetName = "FarmPlot"
+    if floorId ~= "Floor1" then
+        targetName = "FarmPlot_" .. floorId
+    end
+    local fp = myPlot:FindFirstChild(targetName)
+    if fp then return fp end
+    fp = myPlot:FindFirstChild("FarmPlot" .. floorId)
+    if fp then return fp end
+    fp = myPlot:FindFirstChild("FarmPlot")
+    if fp then return fp end
+    for _, child in ipairs(myPlot:GetChildren()) do
+        local name = child.Name:lower()
+        if name:find("farmplot") and name:find(floorId:lower()) then
+            return child
+        end
+    end
+    return nil
+end
+
+task.spawn(function()
+    while _G.AlphaScriptExecutionId == currentExecId do
+        local anyActive = false
+        for _, active in pairs(AutoUnlockGroundToggles) do
+            if active then
+                anyActive = true
+                break
+            end
+        end
+        if anyActive then
+            if not myPlot then myPlot = findMyPlot() end
+            if myPlot then
+                local currentMoney = getMyMoney()
+                local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+                local unlockPlot = remotes and remotes:FindFirstChild("UnlockPlot")
+                if unlockPlot then
+                    for floorId, active in pairs(AutoUnlockGroundToggles) do
+                        if active and _G.AlphaScriptExecutionId == currentExecId then
+                            local farmPlot = findFarmPlot(floorId)
+                            if farmPlot then
+                                local children = farmPlot:GetChildren()
+                                table.sort(children, function(a, b)
+                                    local numA = tonumber(a.Name:match("%d+")) or 0
+                                    local numB = tonumber(b.Name:match("%d+")) or 0
+                                    return numA < numB
+                                end)
+                                for _, child in ipairs(children) do
+                                    local dirt = child:FindFirstChild("Dirt")
+                                    if dirt then
+                                        local isLocked = child:GetAttribute("Locked")
+                                        if isLocked == nil then
+                                            isLocked = child:GetAttribute("IsLocked")
+                                        end
+                                        if isLocked == nil then
+                                            isLocked = child:FindFirstChild("Lock") ~= nil or (dirt.Transparency > 0.1)
+                                        end
+                                        if isLocked then
+                                            local cost = child:GetAttribute("Cost") or child:GetAttribute("Price") or child:GetAttribute("UnlockCost")
+                                            if not cost then
+                                                local floorIndex = tonumber(floorId:match("%d+")) or 1
+                                                local floorData = Configuration and Configuration.FloorConfig and Configuration.FloorConfig[floorIndex]
+                                                if floorData then
+                                                    local bases = floorData.PlotUnlockBase
+                                                    local growth = floorData.PlotUnlockGrowth or 1.4
+                                                    local idx = tonumber(child.Name:match("%d+")) or 1
+                                                    local stage = myPlot:GetAttribute("FarmPlotStage_" .. floorId) or myPlot:GetAttribute("FarmPlotStage") or 1
+                                                    local base = bases and (bases[stage] or bases[#bases] or 25) or 25
+                                                    cost = base * (growth ^ (idx - 1))
+                                                else
+                                                    cost = 0
+                                                end
+                                            end
+                                            if currentMoney >= cost then
+                                                pcall(function()
+                                                    unlockPlot:FireServer(dirt)
+                                                end)
+                                                currentMoney = currentMoney - cost
+                                                task.wait(0.1)
+                                            end
+                                            break
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        task.wait(1)
+    end
+end)
+
+local function getUpgradePrice(floorId, remoteUpgradeName, uiFrameName, currentLevel)
+    if myPlot then
+        local sign = myPlot:FindFirstChild("PlotUpgradeSign")
+        local screen = sign and sign:FindFirstChild("Screen")
+        local surfaceGui = screen and screen:FindFirstChild("SurfaceGui")
+        if surfaceGui then
+            local frame = surfaceGui:FindFirstChild(uiFrameName)
+            local btn = frame and frame:FindFirstChild("Btn")
+            local txt = btn and btn:FindFirstChild("Txt")
+            if txt then
+                local price = parseShortenedNumber(txt.Text)
+                if price > 0 then
+                    return price
+                end
+            end
+        end
+    end
+    
+    local floorIndex = tonumber(floorId:match("%d+")) or 1
+    local floorData = Configuration and Configuration.FloorConfig and Configuration.FloorConfig[floorIndex]
+    if floorData then
+        local base = 80
+        local growth = Configuration.ExtraPowerGrowth or 1.35
+        
+        if remoteUpgradeName:find("Yield") then
+            base = floorData.BaseExtraYieldUpgradeCost or 80
+        elseif remoteUpgradeName:find("Power") then
+            base = floorData.BaseExtraPowerUpgradeCost or 80
+        elseif remoteUpgradeName:find("SawRange") or remoteUpgradeName:find("Range") then
+            local costs = floorData.ExtraSawRangeCosts
+            return costs and costs[currentLevel + 1] or 0
+        elseif remoteUpgradeName:find("SprinklerRange") then
+            local costs = floorData.ExtraSprinklerRangeCosts
+            return costs and costs[currentLevel + 1] or 0
+        end
+        
+        return math.floor(base * (growth ^ (currentLevel or 0)))
+    end
+    
+    return 0
+end
 
 task.spawn(function()
     while _G.AlphaScriptExecutionId == currentExecId do
@@ -423,35 +562,44 @@ task.spawn(function()
         if anyActive then
             if not myPlot then myPlot = findMyPlot() end
             if myPlot then
-                local sign = myPlot:FindFirstChild("PlotUpgradeSign")
-                local screen = sign and sign:FindFirstChild("Screen")
-                local surfaceGui = screen and screen:FindFirstChild("SurfaceGui")
+                local currentMoney = getMyMoney()
+                local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+                local remote = remotes and remotes:FindFirstChild("PlotUpgradeTransaction")
                 
-                if surfaceGui then
-                    local currentMoney = getMyMoney()
-                    local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
-                    local remote = remotes and remotes:FindFirstChild("PlotUpgradeTransaction")
-                    
-                    if remote then
-                        for toggleKey, active in pairs(activeToggles) do
-                            if active and _G.AlphaScriptExecutionId == currentExecId then
-                                local upgradeInfo = registeredUpgrades[toggleKey]
-                                if upgradeInfo then
-                                    local frame = surfaceGui:FindFirstChild(upgradeInfo.uiFrameName)
-                                    local btn = frame and frame:FindFirstChild("Btn")
-                                    local txt = btn and btn:FindFirstChild("Txt")
-                                    
-                                    if txt then
-                                        local price = parseShortenedNumber(txt.Text)
-                                        if price > 0 and currentMoney >= price then
-                                            local success, err = pcall(function()
-                                                remote:InvokeServer(upgradeInfo.remoteUpgradeName, upgradeInfo.floorId)
-                                            end)
-                                            if success then
-                                                currentMoney = currentMoney - price
-                                                task.wait(0.1)
-                                            end
+                if remote then
+                    for toggleKey, active in pairs(activeToggles) do
+                        if active and _G.AlphaScriptExecutionId == currentExecId then
+                            local upgradeInfo = registeredUpgrades[toggleKey]
+                            if upgradeInfo then
+                                local currentLevel = 0
+                                local searchPattern = ""
+                                if upgradeInfo.remoteUpgradeName:find("Yield") then
+                                    searchPattern = "Yield"
+                                elseif upgradeInfo.remoteUpgradeName:find("Power") then
+                                    searchPattern = "Power"
+                                elseif upgradeInfo.remoteUpgradeName:find("SawRange") or upgradeInfo.remoteUpgradeName:find("Range") then
+                                    searchPattern = "SawRange"
+                                elseif upgradeInfo.remoteUpgradeName:find("SprinklerRange") then
+                                    searchPattern = "SprinklerRange"
+                                end
+                                
+                                if searchPattern ~= "" then
+                                    for attrName, value in pairs(myPlot:GetAttributes()) do
+                                        if attrName:lower():find(searchPattern:lower()) and attrName:lower():find(upgradeInfo.floorId:lower()) then
+                                            currentLevel = value
+                                            break
                                         end
+                                    end
+                                end
+                                
+                                local price = getUpgradePrice(upgradeInfo.floorId, upgradeInfo.remoteUpgradeName, upgradeInfo.uiFrameName, currentLevel)
+                                if price > 0 and currentMoney >= price then
+                                    local success, err = pcall(function()
+                                        remote:InvokeServer(upgradeInfo.remoteUpgradeName, upgradeInfo.floorId)
+                                    end)
+                                    if success then
+                                        currentMoney = currentMoney - price
+                                        task.wait(0.1)
                                     end
                                 end
                             end
@@ -482,6 +630,15 @@ local function addFloorSection(floorId, displayName)
         
         local FloorTab = Window:CreateTab(displayName, 4483362458)
         FloorTab:CreateSection("Auto Upgrades")
+        
+        FloorTab:CreateToggle({
+            Name = "Auto Unlock Ground",
+            CurrentValue = false,
+            Flag = "AlphaAutoUnlockGround_" .. floorId,
+            Callback = function(Value)
+                AutoUnlockGroundToggles[floorId] = Value
+            end,
+        })
         
         task.wait(0.5)
         
