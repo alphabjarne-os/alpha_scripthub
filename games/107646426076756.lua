@@ -51,7 +51,16 @@ local function getMyMoney()
     local leaderstats = player:FindFirstChild("leaderstats")
     if leaderstats then
         local moneyObj = leaderstats:FindFirstChild("Cash") or leaderstats:FindFirstChild("Money")
-        if moneyObj then 
+        if not moneyObj then
+            for _, child in ipairs(leaderstats:GetChildren()) do
+                local name = child.Name:lower()
+                if name:find("cash") or name:find("money") or name:find("coin") then
+                    moneyObj = child
+                    break
+                end
+            end
+        end
+        if moneyObj then
             local val = moneyObj.Value
             if type(val) == "string" then
                 return parseShortenedNumber(val)
@@ -96,6 +105,7 @@ MainTab:CreateSection("Auto Roll")
 local RollSeedsEvent = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("RollSeeds")
 local RollAnimationDoneEvent = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("RollAnimationDone")
 local RaritiesConfig = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Registry"):WaitForChild("Rarities"))
+local PlantsConfig = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Registry"):WaitForChild("Plants"))
 
 local AutoRollEnabled = false
 local currentRollId = nil
@@ -104,10 +114,22 @@ local BuyRarities = {
     Other = false,
 }
 local sortedRarities = {}
+local seenRarities = {}
 
 for name, data in pairs(RaritiesConfig) do
     if type(data) == "table" and data.Order then
+        seenRarities[name:lower()] = true
         table.insert(sortedRarities, {Name = name, Order = data.Order})
+    end
+end
+
+for _, plantData in pairs(PlantsConfig) do
+    if type(plantData) == "table" and plantData.Rarity then
+        local rarityName = plantData.Rarity
+        if not seenRarities[rarityName:lower()] then
+            seenRarities[rarityName:lower()] = true
+            table.insert(sortedRarities, {Name = rarityName, Order = 999})
+        end
     end
 end
 
@@ -115,23 +137,68 @@ table.sort(sortedRarities, function(a, b)
     return a.Order < b.Order
 end)
 
+local function isModelMine(model)
+    local rollerPos = nil
+    if not myPlot then myPlot = findMyPlot() end
+    if myPlot then
+        local roller = myPlot:FindFirstChild("SeedRoller")
+        if roller then
+            if roller:IsA("Model") then
+                rollerPos = roller:GetPivot().Position
+            elseif roller:IsA("BasePart") then
+                rollerPos = roller.Position
+            end
+        end
+    end
+    
+    if rollerPos then
+        local success, modelPos = pcall(function() return model:GetPivot().Position end)
+        if success and modelPos then
+            return (modelPos - rollerPos).Magnitude < 35
+        end
+    end
+    
+    local char = player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if root then
+        local success, modelPos = pcall(function() return model:GetPivot().Position end)
+        if success and modelPos then
+            return (modelPos - root.Position).Magnitude < 60
+        end
+    end
+    
+    return true
+end
+
+local function cleanRichText(str)
+    if not str then return "" end
+    return str:gsub("<[^<>]+>", "")
+end
+
+local function findProximityPrompt(parent)
+    for _, child in ipairs(parent:GetDescendants()) do
+        if child:IsA("ProximityPrompt") then
+            return child
+        end
+    end
+    return nil
+end
+
 local function getSeedDetails(seedName)
     local start = tick()
-    local model = nil
-    while tick() - start < 1 and AutoRollEnabled and _G.AlphaScriptExecutionId == currentExecId do
-        model = workspace:FindFirstChild(seedName)
-        if model then
-            local union = model:FindFirstChild("Union")
-            local seedGui = union and union:FindFirstChild("SeedGui")
-            local frame = seedGui and seedGui:FindFirstChild("Frame")
-            local infoFrame = frame and frame:FindFirstChild("InfoFrame")
-            
-            if infoFrame then
-                local rarityLabel = infoFrame:FindFirstChild("Rarity")
-                local costLabel = infoFrame:FindFirstChild("Cost")
-                
-                if rarityLabel and costLabel and rarityLabel.Text ~= "" and costLabel.Text ~= "" then
-                    return rarityLabel.Text, parseShortenedNumber(costLabel.Text), model
+    while tick() - start < 5 and _G.AlphaScriptExecutionId == currentExecId do
+        for _, child in ipairs(workspace:GetChildren()) do
+            if child.Name == seedName and child:IsA("PVInstance") then
+                if isModelMine(child) then
+                    local rarityLabel = child:FindFirstChild("Rarity", true)
+                    local costLabel = child:FindFirstChild("Cost", true)
+                    if rarityLabel and costLabel then
+                        local rarityText = cleanRichText(rarityLabel.Text)
+                        local costText = cleanRichText(costLabel.Text)
+                        if rarityText ~= "" and costText ~= "" then
+                            return rarityText, parseShortenedNumber(costText), child
+                        end
+                    end
                 end
             end
         end
@@ -148,8 +215,6 @@ rollConnection = RollSeedsEvent.OnClientEvent:Connect(function(arg1, arg2)
         end
         return
     end
-    
-    if not AutoRollEnabled then return end
     
     local rollId = nil
     local slots = nil
@@ -168,47 +233,42 @@ rollConnection = RollSeedsEvent.OnClientEvent:Connect(function(arg1, arg2)
         end)
         
         if slots then
+            print("[Alpha Hub] Processing slots: " .. tostring(#slots))
             local currentMoney = getMyMoney()
+            print("[Alpha Hub] Current Money: " .. tostring(currentMoney))
             for slotIndex, slot in ipairs(slots) do
                 local seedName = slot.Seed
                 if seedName then
+                    print("[Alpha Hub] Slot " .. tostring(slotIndex) .. " contains seed: " .. tostring(seedName))
                     local rarity, cost, model = getSeedDetails(seedName)
                     if rarity and cost and model then
                         model.Name = "ProcessedSeed"
                         
                         local rarityClean = rarity:match("^%s*(.-)%s*$")
-                        local knownRarity = false
-                        for k, _ in pairs(BuyRarities) do
-                            if k ~= "Other" and k:lower() == rarityClean:lower() then
-                                knownRarity = true
-                                break
-                            end
+                        local rarityLower = rarityClean:lower()
+                        local shouldBuy = BuyRarities.Other
+                        if BuyRarities[rarityLower] ~= nil then
+                            shouldBuy = BuyRarities[rarityLower]
                         end
                         
-                        local shouldBuy = false
-                        if knownRarity then
-                            shouldBuy = BuyRarities[rarityClean] or BuyRarities[rarityClean:lower()]
-                            if not shouldBuy then
-                                for k, v in pairs(BuyRarities) do
-                                    if v and k:lower() == rarityClean:lower() then
-                                        shouldBuy = true
-                                        break
-                                    end
-                                end
-                            end
-                        else
-                            shouldBuy = BuyRarities.Other
-                        end
+                        print("[Alpha Hub] Seed: " .. tostring(seedName) .. ", Rarity: " .. tostring(rarityClean) .. ", Cost: " .. tostring(cost) .. ", Configured to buy: " .. tostring(shouldBuy) .. ", Has money: " .. tostring(currentMoney >= cost))
                         
                         if shouldBuy and currentMoney >= cost then
-                            local prompt = model:FindFirstChild("Union") and model.Union:FindFirstChild("BuySeed")
-                            if prompt and prompt:IsA("ProximityPrompt") then
+                            local prompt = findProximityPrompt(model)
+                            if prompt then
                                 pcall(function()
+                                    prompt.Enabled = true
+                                    prompt.MaxActivationDistance = 9e9
+                                    prompt.RequiresLineOfSight = false
+                                    prompt.HoldDuration = 0
+                                    task.wait(0.1)
                                     fireproximityprompt(prompt)
                                 end)
                                 print("[Alpha Hub] Auto-bought " .. tostring(rarityClean) .. " " .. tostring(seedName) .. " for $" .. tostring(cost))
                                 currentMoney = currentMoney - cost
                                 task.wait(0.1)
+                            else
+                                print("[Alpha Hub] ProximityPrompt not found in model: " .. tostring(seedName))
                             end
                         end
                     end
