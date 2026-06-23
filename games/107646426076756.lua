@@ -1179,7 +1179,6 @@ local function setupFloorTab(floorIndex)
         if floorIndex == 1 then
             sign = myPlot:WaitForChild("PlotUpgradeSign", 10)
         else
-            -- For Floors 2-4, wait until the Floor folder/model container is added to myPlot
             while _G.AlphaScriptExecutionId == currentExecId do
                 if myPlot then
                     local floorFolder = myPlot:FindFirstChild(floorId)
