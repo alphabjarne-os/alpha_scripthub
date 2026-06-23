@@ -104,11 +104,13 @@ MainTab:CreateSection("Auto Roll")
 
 local RollSeedsEvent = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("RollSeeds")
 local RollAnimationDoneEvent = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("RollAnimationDone")
+local BuySeedEvent = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("BuySeed", 5)
 local RaritiesConfig = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Registry"):WaitForChild("Rarities"))
 local PlantsConfig = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Registry"):WaitForChild("Plants"))
 
 local AutoRollEnabled = false
 local currentRollId = nil
+local isProcessingRoll = false
 
 local BuyRarities = {
     Other = false,
@@ -227,6 +229,7 @@ rollConnection = RollSeedsEvent.OnClientEvent:Connect(function(arg1, arg2)
     end
     
     if rollId then
+        isProcessingRoll = true
         currentRollId = rollId
         pcall(function()
             RollAnimationDoneEvent:FireServer(rollId)
@@ -281,27 +284,22 @@ rollConnection = RollSeedsEvent.OnClientEvent:Connect(function(arg1, arg2)
                         print("[Alpha Hub] Seed: " .. tostring(seedName) .. ", Rarity: " .. tostring(rarityClean) .. ", Cost: " .. tostring(cost) .. ", Configured to buy: " .. tostring(shouldBuy) .. ", Has money: " .. tostring(currentMoney >= cost))
                         
                         if shouldBuy and currentMoney >= cost then
-                            local prompt = findProximityPrompt(model)
-                            if prompt then
+                            if BuySeedEvent then
                                 pcall(function()
-                                    prompt.Enabled = true
-                                    prompt.MaxActivationDistance = 9e9
-                                    prompt.RequiresLineOfSight = false
-                                    prompt.HoldDuration = 0
-                                    task.wait(0.1)
-                                    fireproximityprompt(prompt)
+                                    BuySeedEvent:FireServer(slotIndex)
                                 end)
-                                print("[Alpha Hub] Auto-bought " .. tostring(rarityClean) .. " " .. tostring(seedName) .. " for $" .. tostring(cost))
+                                print("[Alpha Hub] Auto-bought " .. tostring(rarityClean) .. " " .. tostring(seedName) .. " via event for slot " .. tostring(slotIndex))
                                 currentMoney = currentMoney - cost
                                 task.wait(0.1)
                             else
-                                print("[Alpha Hub] ProximityPrompt not found in model: " .. tostring(seedName))
+                                print("[Alpha Hub] BuySeed RemoteEvent not found!")
                             end
                         end
                     end
                 end
             end
         end
+        isProcessingRoll = false
     end
 end)
 
@@ -321,12 +319,12 @@ MainTab:CreateToggle({
                     end)
                     
                     local elapsed = 0
-                    while currentRollId == lastRollId and elapsed < 5 and AutoRollEnabled and _G.AlphaScriptExecutionId == currentExecId do
-                        task.wait(0.1)
-                        elapsed = elapsed + 0.1
+                    while (currentRollId == lastRollId or isProcessingRoll) and elapsed < 8 and AutoRollEnabled and _G.AlphaScriptExecutionId == currentExecId do
+                        task.wait(0.05)
+                        elapsed = elapsed + 0.05
                     end
                     
-                    task.wait(1)
+                    task.wait(0.1)
                 end
             end)
         end
