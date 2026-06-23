@@ -113,53 +113,57 @@ local function addFloorSection(floorId, displayName)
         MainTab:CreateSection("Auto Upgrade (" .. displayName .. ")")
         
         for _, child in ipairs(surfaceGui:GetChildren()) do
-            if child:IsA("GuiObject") and child:FindFirstChild("Btn") and child.Btn:FindFirstChild("Txt") then
-                local uiFrameName = child.Name
+            if child:IsA("GuiObject") then
+                local btn = child:FindFirstChild("Btn")
+                local txt = btn and btn:FindFirstChild("Txt")
                 
-                local remoteUpgradeName = uiFrameName
-                if not remoteUpgradeName:find("^Extra") then
-                    remoteUpgradeName = "Extra" .. remoteUpgradeName
-                end
-                
-                local toggleKey = floorId .. "_" .. remoteUpgradeName
-                activeToggles[toggleKey] = false
-                
-                MainTab:CreateToggle({
-                    Name = "Auto " .. remoteUpgradeName .. " Upgrade",
-                    CurrentValue = false,
-                    Flag = "Flag_" .. toggleKey,
-                    Callback = function(Value)
-                        activeToggles[toggleKey] = Value
-                        if Value then
-                            task.spawn(function()
-                                while activeToggles[toggleKey] and _G.AlphaScriptExecutionId == currentExecId do
-                                    if not myPlot then myPlot = findMyPlot() end
-                                    if myPlot then
-                                        local currentFloorObj = myPlot:FindFirstChild(floorId)
-                                        local currentSign = currentFloorObj and currentFloorObj:FindFirstChild("PlotUpgradeSign")
-                                        local currentGui = currentSign and currentSign:FindFirstChild("Screen") and currentSign.Screen:FindFirstChild("SurfaceGui")
-                                        local currentFrame = currentGui and currentGui:FindFirstChild(uiFrameName)
-                                        
-                                        if currentFrame and currentFrame:FindFirstChild("Btn") and currentFrame.Btn:FindFirstChild("Txt") then
-                                            local price = parseShortenedNumber(currentFrame.Btn.Txt.Text)
-                                            local currentMoney = getMyMoney()
+                if txt then
+                    local uiFrameName = child.Name
+                    local remoteUpgradeName = uiFrameName
+                    if not remoteUpgradeName:find("^Extra") then
+                        remoteUpgradeName = "Extra" .. remoteUpgradeName
+                    end
+                    
+                    local toggleKey = floorId .. "_" .. remoteUpgradeName
+                    activeToggles[toggleKey] = false
+                    
+                    MainTab:CreateToggle({
+                        Name = "Auto " .. remoteUpgradeName .. " Upgrade",
+                        CurrentValue = false,
+                        Flag = "Flag_" .. toggleKey,
+                        Callback = function(Value)
+                            activeToggles[toggleKey] = Value
+                            if Value then
+                                task.spawn(function()
+                                    while activeToggles[toggleKey] and _G.AlphaScriptExecutionId == currentExecId do
+                                        if not myPlot then myPlot = findMyPlot() end
+                                        if myPlot then
+                                            local currentFloorObj = myPlot:FindFirstChild(floorId)
+                                            local currentSign = currentFloorObj and currentFloorObj:FindFirstChild("PlotUpgradeSign")
+                                            local currentGui = currentSign and currentSign:FindFirstChild("Screen") and currentSign.Screen:FindFirstChild("SurfaceGui")
+                                            local currentFrame = currentGui and currentGui:FindFirstChild(uiFrameName)
                                             
-                                            if price > 0 and currentMoney >= price then
-                                                local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
-                                                local remote = remotes and remotes:FindFirstChild("PlotUpgradeTransaction")
-                                                if remote then
-                                                    remote:InvokeServer(remoteUpgradeName, floorId)
-                                                    task.wait(1.5)
+                                            if currentFrame and currentFrame:FindFirstChild("Btn") and currentFrame.Btn:FindFirstChild("Txt") then
+                                                local price = parseShortenedNumber(currentFrame.Btn.Txt.Text)
+                                                local currentMoney = getMyMoney()
+                                                
+                                                if price > 0 and currentMoney >= price then
+                                                    local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+                                                    local remote = remotes and remotes:FindFirstChild("PlotUpgradeTransaction")
+                                                    if remote then
+                                                        remote:InvokeServer(remoteUpgradeName, floorId)
+                                                        task.wait(1.5)
+                                                    end
                                                 end
                                             end
                                         end
+                                        task.wait(1)
                                     end
-                                    task.wait(1)
-                                end
-                            end)
+                                end)
+                            end
                         end
-                    end
-                })
+                    })
+                end
             end
         end
     end)
