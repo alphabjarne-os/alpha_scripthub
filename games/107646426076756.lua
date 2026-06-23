@@ -404,10 +404,11 @@ MainTab:CreateToggle({
                                                     end
                                                 end
                                                 if cost and cost > 0 and currentMoney >= cost then
+                                                    print(cost)
                                                     pcall(function()
                                                         unlockPlot:FireServer(dirt)
                                                     end)
-                                                    currentMoney = currentMoney - cost
+                                                    currentMoney = getMyMoney()
                                                     task.wait(0.1)
                                                 end
                                             end
