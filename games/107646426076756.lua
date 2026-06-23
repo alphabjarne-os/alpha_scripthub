@@ -137,76 +137,6 @@ table.sort(sortedRarities, function(a, b)
     return a.Order < b.Order
 end)
 
-local function isModelMine(model)
-    local rollerPos = nil
-    if not myPlot then myPlot = findMyPlot() end
-    if myPlot then
-        local roller = myPlot:FindFirstChild("SeedRoller")
-        if roller then
-            if roller:IsA("Model") then
-                rollerPos = roller:GetPivot().Position
-            elseif roller:IsA("BasePart") then
-                rollerPos = roller.Position
-            end
-        end
-    end
-    
-    if rollerPos then
-        local success, modelPos = pcall(function() return model:GetPivot().Position end)
-        if success and modelPos then
-            return (modelPos - rollerPos).Magnitude < 35
-        end
-    end
-    
-    local char = player.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if root then
-        local success, modelPos = pcall(function() return model:GetPivot().Position end)
-        if success and modelPos then
-            return (modelPos - root.Position).Magnitude < 60
-        end
-    end
-    
-    return true
-end
-
-local function cleanRichText(str)
-    if not str then return "" end
-    return str:gsub("<[^<>]+>", "")
-end
-
-local function findProximityPrompt(parent)
-    for _, child in ipairs(parent:GetDescendants()) do
-        if child:IsA("ProximityPrompt") then
-            return child
-        end
-    end
-    return nil
-end
-
-local function getSeedDetails(seedName)
-    local start = tick()
-    while tick() - start < 5 and _G.AlphaScriptExecutionId == currentExecId do
-        for _, child in ipairs(workspace:GetChildren()) do
-            if child.Name == seedName and child:IsA("PVInstance") then
-                if isModelMine(child) then
-                    local rarityLabel = child:FindFirstChild("Rarity", true)
-                    local costLabel = child:FindFirstChild("Cost", true)
-                    if rarityLabel and costLabel then
-                        local rarityText = cleanRichText(rarityLabel.Text)
-                        local costText = cleanRichText(costLabel.Text)
-                        if rarityText ~= "" and costText ~= "" then
-                            return rarityText, parseShortenedNumber(costText), child
-                        end
-                    end
-                end
-            end
-        end
-        task.wait(0.05)
-    end
-    return nil, nil, nil
-end
-
 local rollConnection
 rollConnection = RollSeedsEvent.OnClientEvent:Connect(function(arg1, arg2)
     if _G.AlphaScriptExecutionId ~= currentExecId then
@@ -265,9 +195,10 @@ rollConnection = RollSeedsEvent.OnClientEvent:Connect(function(arg1, arg2)
             for slotIndex, slot in ipairs(slots) do
                 local seedName = slot.Seed
                 if seedName then
-                    local rarity, cost, model = getSeedDetails(seedName)
-                    if rarity and cost and model then
-                        model.Name = "ProcessedSeed"
+                    local plantData = PlantsConfig[seedName]
+                    if plantData then
+                        local rarity = plantData.Rarity
+                        local cost = plantData.Cost
                         
                         local rarityClean = rarity:match("^%s*(.-)%s*$")
                         local rarityLower = rarityClean:lower()
@@ -293,7 +224,11 @@ rollConnection = RollSeedsEvent.OnClientEvent:Connect(function(arg1, arg2)
                                     BuySeedEvent:FireServer(slotIndex)
                                 end)
                                 currentMoney = currentMoney - cost
-                                task.wait(0.1)
+                                local model = workspace:FindFirstChild(seedName)
+                                if model then
+                                    model.Name = "ProcessedSeed"
+                                end
+                                task.wait(0.05)
                             else
                                 warn("[Alpha Hub] BuySeed RemoteEvent not found!")
                             end
