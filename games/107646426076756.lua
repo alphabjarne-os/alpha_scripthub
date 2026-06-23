@@ -21,8 +21,9 @@ local function parseShortenedNumber(str)
     if not str then return 0 end
     
     local clean = str:gsub("[$,]", "")
-    local suffix = clean:match("%a+$")
+    if clean:lower():find("max") then return -1 end
     
+    local suffix = clean:match("%a+$")
     if not suffix then
         return tonumber(clean) or 0
     end
@@ -49,7 +50,7 @@ local function parseShortenedNumber(str)
 end
 
 local function getPrice(floor, upgrade)
-    if not myPlot then return 0 end
+    if not myPlot then return -1 end
     local floorObj = myPlot:FindFirstChild(floor)
     if floorObj then
         local upgradeObj = floorObj:FindFirstChild(upgrade)
@@ -60,26 +61,22 @@ local function getPrice(floor, upgrade)
             end
         end
     end
-    return 0
+    return -1
 end
 
 local function getMyMoney()
     local leaderstats = player:FindFirstChild("leaderstats")
     if leaderstats then
-        local money = leaderstats:FindFirstChild("Money") or leaderstats:FindFirstChild("Cash")
-        if money then 
-            if type(money.Value) == "string" then
-                return parseShortenedNumber(money.Value)
+        local moneyObj = leaderstats:FindFirstChild("Cash") or leaderstats:FindFirstChild("Money")
+        if moneyObj then 
+            local val = moneyObj.Value
+            if type(val) == "string" then
+                return parseShortenedNumber(val)
             end
-            return money.Value 
+            return tonumber(val) or 0
         end
     end
-    
-    local attrMoney = player:GetAttribute("Money") or player:GetAttribute("Cash")
-    if type(attrMoney) == "string" then
-        return parseShortenedNumber(attrMoney)
-    end
-    return attrMoney or 0
+    return 0
 end
 
 local MainTab = Window:CreateTab("Main", 4483362458)
@@ -143,11 +140,13 @@ local function addFloorSection(floorId, displayName)
                             if myPlot then
                                 local price = getPrice(floorId, upgradeName)
                                 local currentMoney = getMyMoney()
-                                if currentMoney >= price then
+                                
+                                if price > 0 and currentMoney >= price then
                                     local remote = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes") 
                                         and game:GetService("ReplicatedStorage").Remotes:FindFirstChild("PlotUpgradeTransaction")
                                     if remote then
                                         remote:InvokeServer(upgradeName, floorId)
+                                        task.wait(1)
                                     end
                                 end
                             end
