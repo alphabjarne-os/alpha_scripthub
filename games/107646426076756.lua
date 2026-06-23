@@ -112,9 +112,7 @@ local AutoRollEnabled = false
 local currentRollId = nil
 local isProcessingRoll = false
 
-local BuyRarities = {
-    Other = false,
-}
+local SelectedRarities = {}
 local sortedRarities = {}
 local seenRarities = {}
 
@@ -273,9 +271,20 @@ rollConnection = RollSeedsEvent.OnClientEvent:Connect(function(arg1, arg2)
                         
                         local rarityClean = rarity:match("^%s*(.-)%s*$")
                         local rarityLower = rarityClean:lower()
-                        local shouldBuy = BuyRarities.Other
-                        if BuyRarities[rarityLower] ~= nil then
-                            shouldBuy = BuyRarities[rarityLower]
+                        
+                        local knownRarity = false
+                        for _, rarityInfo in ipairs(sortedRarities) do
+                            if rarityInfo.Name:lower() == rarityLower then
+                                knownRarity = true
+                                break
+                            end
+                        end
+                        
+                        local shouldBuy = false
+                        if knownRarity then
+                            shouldBuy = SelectedRarities[rarityLower] == true
+                        else
+                            shouldBuy = SelectedRarities["other"] == true
                         end
                         
                         if shouldBuy and currentMoney >= cost then
@@ -327,28 +336,27 @@ MainTab:CreateToggle({
 
 MainTab:CreateSection("Auto Buy Rarities")
 
+local rarityOptions = {}
+table.insert(rarityOptions, "Other")
 for _, rarityInfo in ipairs(sortedRarities) do
-    local rarityName = rarityInfo.Name
-    BuyRarities[rarityName] = false
-    BuyRarities[rarityName:lower()] = false
-    
-    MainTab:CreateToggle({
-        Name = "Buy " .. rarityName,
-        CurrentValue = false,
-        Flag = "AlphaBuy" .. rarityName,
-        Callback = function(Value)
-            BuyRarities[rarityName] = Value
-            BuyRarities[rarityName:lower()] = Value
-        end,
-    })
+    table.insert(rarityOptions, rarityInfo.Name)
 end
 
-MainTab:CreateToggle({
-    Name = "Buy Other",
-    CurrentValue = false,
-    Flag = "AlphaBuyOther",
-    Callback = function(Value)
-        BuyRarities.Other = Value
+MainTab:CreateDropdown({
+    Name = "Auto Buy Rarities",
+    Options = rarityOptions,
+    CurrentOption = {},
+    MultipleOptions = true,
+    Flag = "AlphaAutoBuyRaritiesDropdown",
+    Callback = function(Option)
+        SelectedRarities = {}
+        if type(Option) == "table" then
+            for _, opt in ipairs(Option) do
+                SelectedRarities[opt:lower()] = true
+            end
+        elseif type(Option) == "string" then
+            SelectedRarities[Option:lower()] = true
+        end
     end,
 })
 
