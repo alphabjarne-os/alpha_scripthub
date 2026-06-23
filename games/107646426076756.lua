@@ -382,19 +382,27 @@ MainTab:CreateButton({
         end
         
         task.spawn(function()
-            for _, farmPlot in ipairs(activePlots) do
-                for _, slot in ipairs(farmPlot:GetChildren()) do
-                    local dirt = slot:FindFirstChild("Dirt")
-                    if dirt then
-                        local crop = getSlotCrop(slot)
-                        if crop then
-                            pcall(function()
-                                removePlant:FireServer(dirt)
-                            end)
-                            task.wait(0.02)
+            for attempt = 1, 5 do
+                local plantsFound = 0
+                for _, farmPlot in ipairs(activePlots) do
+                    for _, slot in ipairs(farmPlot:GetChildren()) do
+                        local dirt = slot:FindFirstChild("Dirt")
+                        if dirt then
+                            local crop = getSlotCrop(slot)
+                            if crop then
+                                plantsFound = plantsFound + 1
+                                pcall(function()
+                                    removePlant:FireServer(dirt)
+                                end)
+                                task.wait(0.04)
+                            end
                         end
                     end
                 end
+                if plantsFound == 0 then
+                    break
+                end
+                task.wait(0.5)
             end
         end)
     end,
@@ -806,11 +814,13 @@ local function shouldAutoBuySeed(seedName, currentMoney)
         local maxAffordablePrice = 0
         local bestPlant = nil
         for name, pData in pairs(PlantsConfig) do
-            local pPrice = pData.Price or 0
-            if pPrice > 0 and pPrice <= currentMoney then
-                if pPrice > maxAffordablePrice then
-                    maxAffordablePrice = pPrice
-                    bestPlant = pData
+            if type(pData) == "table" then
+                local pPrice = pData.Price or 0
+                if pPrice > 0 and pPrice <= currentMoney then
+                    if pPrice > maxAffordablePrice then
+                        maxAffordablePrice = pPrice
+                        bestPlant = pData
+                    end
                 end
             end
         end
@@ -1063,12 +1073,14 @@ task.spawn(function()
                 local bestPlant = nil
                 local bestPlantName = "None"
                 for name, pData in pairs(PlantsConfig) do
-                    local pPrice = pData.Price or 0
-                    if pPrice > 0 and pPrice <= currentMoney then
-                        if pPrice > maxAffordablePrice then
-                            maxAffordablePrice = pPrice
-                            bestPlant = pData
-                            bestPlantName = name
+                    if type(pData) == "table" then
+                        local pPrice = pData.Price or 0
+                        if pPrice > 0 and pPrice <= currentMoney then
+                            if pPrice > maxAffordablePrice then
+                                maxAffordablePrice = pPrice
+                                bestPlant = pData
+                                bestPlantName = name
+                            end
                         end
                     end
                 end
