@@ -231,10 +231,12 @@ MainTab:CreateToggle({
                                                 isLocked = child:FindFirstChild("Lock") ~= nil or (dirt.Transparency > 0.1)
                                             end
                                         end
+                                        warn(string.format("[Alpha Hub Debug] Plot: %s, isLocked: %s", child.Name, tostring(isLocked)))
                                         if isLocked then
                                             local plotKey = child:GetAttribute("PlotKey") or tonumber(child.Name:match("%d+")) or 1
                                             local ring = math.floor((plotKey - 1) / 10) + 1
                                             local farmPlotStage = farmPlot:GetAttribute("FarmPlotStage") or farmPlot:GetAttribute("Stage") or myPlot:GetAttribute("FarmPlotStage_Floor1") or myPlot:GetAttribute("Stage_Floor1") or farmPlot:GetAttribute("FarmPlotStage_Floor1") or 1
+                                            warn(string.format("[Alpha Hub Debug] PlotKey: %s, Ring: %d, Stage: %s, ring <= stage: %s", tostring(plotKey), ring, tostring(farmPlotStage), tostring(ring <= farmPlotStage)))
                                             if ring <= farmPlotStage then
                                                 local cost = nil
                                                 local rawCost = child:GetAttribute("Cost") or child:GetAttribute("Price") or child:GetAttribute("UnlockCost") or dirt:GetAttribute("Cost") or dirt:GetAttribute("Price") or dirt:GetAttribute("UnlockCost")
@@ -250,7 +252,7 @@ MainTab:CreateToggle({
                                                         if textLabel then
                                                             local parsed = parseShortenedNumber(textLabel.Text)
                                                             if parsed > 0 then
-                                                                cost = parsed
+                                                                 cost = parsed
                                                             end
                                                         end
                                                     end
@@ -268,6 +270,7 @@ MainTab:CreateToggle({
                                                         cost = 0
                                                     end
                                                 end
+                                                warn(string.format("[Alpha Hub Debug] Cost: %s, Cash: %s", tostring(cost), tostring(currentMoney)))
                                                 if cost and cost > 0 and currentMoney >= cost then
                                                     pcall(function()
                                                         unlockPlot:FireServer(dirt)
