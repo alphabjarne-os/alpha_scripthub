@@ -120,6 +120,35 @@ MainTab:CreateToggle({
     end,
 })
 
+MainTab:CreateSection("Auto Upgrades")
+
+MainTab:CreateToggle({
+    Name = "Auto Upgrade Seed Rolls",
+    CurrentValue = false,
+    Flag = "AlphaMainAutoUpgradeSeedRolls",
+    Callback = function(Value)
+        AutoUpgradeSeedRolls = Value
+    end,
+})
+
+MainTab:CreateToggle({
+    Name = "Auto Upgrade Seed Luck",
+    CurrentValue = false,
+    Flag = "AlphaMainAutoUpgradeSeedLuck",
+    Callback = function(Value)
+        AutoUpgradeSeedLuck = Value
+    end,
+})
+
+MainTab:CreateToggle({
+    Name = "Auto Upgrade Farm",
+    CurrentValue = false,
+    Flag = "AlphaMainAutoUpgradeFarm",
+    Callback = function(Value)
+        AutoUpgradeFarm = Value
+    end,
+})
+
 MainTab:CreateSection("Auto Roll")
 
 local RollSeedsEvent = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("RollSeeds")
@@ -133,7 +162,9 @@ local AutoRollEnabled = false
 local currentRollId = nil
 local isProcessingRoll = false
 local lastSlotsData = nil
-local SkipAnimationEnabled = false
+local AutoUpgradeSeedRolls = false
+local AutoUpgradeSeedLuck = false
+local AutoUpgradeFarm = false
 
 local SelectedRarities = {}
 local sortedRarities = {}
@@ -249,36 +280,31 @@ rollConnection = RollSeedsEvent.OnClientEvent:Connect(function(arg1, arg2)
                 prompt = roller:FindFirstChildWhichIsA("ProximityPrompt", true)
             end
             
-            local isSkipped = SkipAnimationEnabled
-            if not isSkipped then
-                if prompt then
-                    local startCheck = tick()
-                    while prompt.Enabled and tick() - startCheck < 0.5 do
-                        task.wait()
-                    end
-                    if not prompt.Enabled then
-                        local completed = false
-                        local conn
-                        conn = prompt:GetPropertyChangedSignal("Enabled"):Connect(function()
-                            if prompt.Enabled then
-                                completed = true
-                                if conn then conn:Disconnect() end
-                            end
-                        end)
-                        local start = tick()
-                        while not completed and tick() - start < 3 do
-                            task.wait(0.05)
-                        end
-                        if conn then conn:Disconnect() end
-                    end
-                else
-                    task.wait(1.5)
+            if prompt then
+                local startCheck = tick()
+                while prompt.Enabled and tick() - startCheck < 0.5 do
+                    task.wait()
                 end
+                if not prompt.Enabled then
+                    local completed = false
+                    local conn
+                    conn = prompt:GetPropertyChangedSignal("Enabled"):Connect(function()
+                        if prompt.Enabled then
+                            completed = true
+                            if conn then conn:Disconnect() end
+                        end
+                    end)
+                    local start = tick()
+                    while not completed and tick() - start < 3 do
+                        task.wait(0.05)
+                    end
+                    if conn then conn:Disconnect() end
+                end
+            else
+                task.wait(1.5)
             end
             
-            if not isSkipped then
-                task.wait(0.2)
-            end
+            task.wait(0.2)
             
             if slots then
                 local currentMoney = getMyMoney()
@@ -369,15 +395,6 @@ MainTab:CreateToggle({
                 end
             end)
         end
-    end,
-})
-
-MainTab:CreateToggle({
-    Name = "Skip Animation",
-    CurrentValue = false,
-    Flag = "AlphaSkipAnimationToggle",
-    Callback = function(Value)
-        SkipAnimationEnabled = Value
     end,
 })
 
@@ -612,6 +629,82 @@ task.spawn(function()
     end
 end)
 
+task.spawn(function()
+    while _G.AlphaScriptExecutionId == currentExecId do
+        if AutoUpgradeSeedRolls or AutoUpgradeSeedLuck or AutoUpgradeFarm then
+            if not myPlot then myPlot = findMyPlot() end
+            if myPlot then
+                local currentMoney = getMyMoney()
+                local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+                
+                if AutoUpgradeSeedRolls then
+                    local rollsLevel = 1
+                    for attrName, value in pairs(myPlot:GetAttributes()) do
+                        if attrName:lower():find("rolls") then
+                            rollsLevel = value
+                            break
+                        end
+                    end
+                    local cost = Configuration and Configuration.ExtraSeedRollsCosts and Configuration.ExtraSeedRollsCosts[rollsLevel + 1] or 0
+                    if cost > 0 and currentMoney >= cost then
+                        local remote = remotes and remotes:FindFirstChild("UpgradeSeedRolls")
+                        if remote then
+                            local success = pcall(function()
+                                remote:InvokeServer()
+                            end)
+                            if success then
+                                currentMoney = currentMoney - cost
+                                task.wait(0.1)
+                            end
+                        end
+                    end
+                end
+                
+                if AutoUpgradeSeedLuck then
+                    local luckLevel = 1
+                    for attrName, value in pairs(myPlot:GetAttributes()) do
+                        if attrName:lower():find("luck") then
+                            luckLevel = value
+                            break
+                        end
+                    end
+                    local cost = math.floor(60 * (1.35 ^ (luckLevel - 1)))
+                    if currentMoney >= cost then
+                        local remote = remotes and remotes:FindFirstChild("UpgradeSeedLuck")
+                        if remote then
+                            local success = pcall(function()
+                                remote:InvokeServer()
+                            end)
+                            if success then
+                                currentMoney = currentMoney - cost
+                                task.wait(0.1)
+                            end
+                        end
+                    end
+                end
+                
+                if AutoUpgradeFarm then
+                    local farmStage = myPlot:GetAttribute("FarmPlotStage") or 1
+                    local cost = Configuration and Configuration.FarmExpandCosts and Configuration.FarmExpandCosts[farmStage + 1] or 0
+                    if cost > 0 and currentMoney >= cost then
+                        local remote = remotes and remotes:FindFirstChild("UpgradeFarm")
+                        if remote then
+                            local success = pcall(function()
+                                remote:InvokeServer()
+                            end)
+                            if success then
+                                currentMoney = currentMoney - cost
+                                task.wait(0.1)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        task.wait(1)
+    end
+end)
+
 local function addFloorSection(floorId, displayName)
     task.spawn(function()
         while _G.AlphaScriptExecutionId == currentExecId do
@@ -632,9 +725,9 @@ local function addFloorSection(floorId, displayName)
         FloorTab:CreateSection("Auto Upgrades")
         
         FloorTab:CreateToggle({
-            Name = "Auto Unlock Ground",
+            Name = "Auto Buy Ground",
             CurrentValue = false,
-            Flag = "AlphaAutoUnlockGround_" .. floorId,
+            Flag = "AlphaAutoBuyGround_" .. floorId,
             Callback = function(Value)
                 AutoUnlockGroundToggles[floorId] = Value
             end,
