@@ -814,13 +814,12 @@ local function shouldAutoBuySeed(seedName, currentMoney)
         local maxAffordablePrice = 0
         local bestPlant = nil
         for name, pData in pairs(PlantsConfig) do
-            if type(pData) == "table" then
-                local pPrice = pData.Price or 0
-                if pPrice > 0 and pPrice <= currentMoney then
-                    if pPrice > maxAffordablePrice then
-                        maxAffordablePrice = pPrice
-                        bestPlant = pData
-                    end
+            if type(pData) ~= "table" then continue end
+            local pPrice = pData.Price or 0
+            if pPrice > 0 and pPrice <= currentMoney then
+                if pPrice > maxAffordablePrice then
+                    maxAffordablePrice = pPrice
+                    bestPlant = pData
                 end
             end
         end
