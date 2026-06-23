@@ -4,8 +4,6 @@ local player = game.Players.LocalPlayer
 local myPlot = nil
 local AntiAFKEnabled = false
 
--- test
-
 local virtualUser = game:GetService("VirtualUser")
 player.Idled:Connect(function()
     if AntiAFKEnabled then
@@ -244,7 +242,7 @@ rollConnection = RollSeedsEvent.OnClientEvent:Connect(function(arg1, arg2)
         
         pcall(function()
             if slots then
-                task.wait(0.05)
+                task.wait(1.5)
                 local currentMoney = getMyMoney()
                 for slotIndex, slot in ipairs(slots) do
                     local seedName = slot.Seed
